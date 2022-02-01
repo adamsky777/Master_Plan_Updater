@@ -57,6 +57,10 @@ df4 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/gmv_(witho
 df4 = df4.fillna("0")
 shape_df4 = df4.shape
 
+#average order duration df5
+df5 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/average_order_duration,_minutes.csv")
+df5 = df5.fillna("0")
+
 
 today = date.today()
 
@@ -160,7 +164,7 @@ def MP_row_value(MP_Sheet):
     MP_column_A_data = MP_Sheet.values_batch_get('Daily!C:C').get('valueRanges')
     MP_column_A_list = MP_column_A_data[0]
     MP_column_A_list = MP_column_A_list.get('values')
-    crit =['Active supply (on street)'], ['Rides'], ['Ridden vehicles'], ['Revenue']
+    crit =['Active supply (on street)'], ['Rides'], ['Ridden vehicles'], ['Revenue'], ['Ride Duration (minutes)']
     row_list = [i for i in crit if i in MP_column_A_list]
     row_indexes = [MP_column_A_list.index(x) for x in row_list]
     row_indexes = [x+1 for x in row_indexes]
@@ -297,6 +301,7 @@ def update():
                     city_GMV_without_passes = retrieve_values(df4, CITY_NAME)
                     city_GMV_without_passes = zerocomma(city_GMV_without_passes)
                     city_GMV = replacesign(city_GMV_without_passes) + replaceEuro(city_GMV_passes)
+                    ride_duration = retrieve_values(df5, CITY_NAME)
                     print(CITY_URL)
                     MP_sheet = gc.open_by_url(CITY_URL)
                     column_value = MP_column_value(MP_sheet)
@@ -308,6 +313,10 @@ def update():
                     MP_WS.update_cell(row_value[1], column_value, city_rides)
                     MP_WS.update_cell(row_value[2], column_value, scooters_with_rides)
                     MP_WS.update_cell(row_value[3], column_value, city_GMV)
+                    MP_WS.update_cell(row_value[4], column_value, ride_duration)
+                    """
+                    Row value[x] is always the th elemnt in list "crit"
+                    """
                     sleep(5)
                     cities_passed += 1
                 downloads_folder_path = read_downloads_folder_path()
