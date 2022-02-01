@@ -1,6 +1,6 @@
 from setuptools import setup
 
-APP = ['Master_Plan_Updater.py']
+APP = ['Master Plan Updater.py']
 DATA_FILES = ['keys.json', 'credentials_path_container.yaml', 'downloads_path_container.yaml', 'Master_Plan_links.csv',
               'E-Bikes_Master_Plan_links.csv']
 OPTIONS = {
