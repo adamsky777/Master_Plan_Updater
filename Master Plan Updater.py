@@ -23,8 +23,6 @@ import sys
 import pyminizip
 import os
 
-version_number = "RPV22ZIPA"
-past_version_number = "RPV22ZIPA"
 
 try:
     df0 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/average_daily_active_vehicles_on_the_street.csv")
@@ -70,6 +68,7 @@ df5 = df5.fillna("0")
 
 today = date.today()
 
+locker = "19StayHungryStayFoolish84"
 
 def save_user_data():
     """
@@ -87,7 +86,7 @@ def save_user_data():
                                      os.path.join(os.getcwd(), 'credentials_path_container.yaml'),
                                      os.path.join(os.getcwd(), 'E-Bikes_Master_Plan_links.csv'),
                                                   os.path.join(os.getcwd(),'Master_Plan_links.csv')],
-                                    [u'/', u'/', u'/', u'/'], save_path, version_number, 0)
+                                    [u'/', u'/', u'/', u'/'], save_path, locker, 0)
         messagebox.showinfo(message="User data saved")
     else:
         messagebox.showinfo(message=" User data not saved")
@@ -104,7 +103,7 @@ def import_user_data():
     import_path = filedialog.askopenfilename(filetypes=[('Zip File', '*.zip')])
     if import_path != "":
         with zipfile.ZipFile(import_path, 'r') as user_data_zip:
-            user_data_zip.extractall(pwd=past_version_number.encode())
+            user_data_zip.extractall(pwd=locker.encode())
         messagebox.showinfo(message="User Data successfully loaded")
         os.remove(import_path)
     else:
