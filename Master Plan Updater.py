@@ -1,6 +1,7 @@
 import json
 import time
 import tkinter.ttk
+import zipfile
 from tkinter import *
 import csv
 from tkinter import messagebox
@@ -19,6 +20,11 @@ import webbrowser
 from datetime import timedelta
 import datetime
 import sys
+import pyminizip
+import os
+
+version_number = "RPV22ZIPA"
+past_version_number = "RPV22ZIPA"
 
 try:
     df0 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/average_daily_active_vehicles_on_the_street.csv")
@@ -63,6 +69,46 @@ df5 = df5.fillna("0")
 
 
 today = date.today()
+
+
+def save_user_data():
+    """
+    Creates an an encrypted zip file of the user data, if a user has 20-30 or even more cities, it might become time
+    consuming to add the cities to the list again.
+    The encrypted zip file contains all the previously saved data of the user.
+    User can choose where to save the file and the save option is available from the menu bar.
+    :returns: The encrypted zip file
+    """
+    save_path = filedialog.askdirectory()
+    if save_path != "":
+        save_path = save_path+ "/user_data.zip"
+        pyminizip.compress_multiple([os.path.join(os.getcwd(),
+                                                  'downloads_path_container.yaml'),
+                                     os.path.join(os.getcwd(), 'credentials_path_container.yaml'),
+                                     os.path.join(os.getcwd(), 'E-Bikes_Master_Plan_links.csv'),
+                                                  os.path.join(os.getcwd(),'Master_Plan_links.csv')],
+                                    [u'/', u'/', u'/', u'/'], save_path, version_number, 0)
+        messagebox.showinfo(message="User data saved")
+    else:
+        messagebox.showinfo(message=" User data not saved")
+
+
+
+
+def import_user_data():
+    """
+    Loads the user data from the encrypted zip file.
+    User can load the data from the menu bar.
+    :returns: Replaces the program's default files by the the previously saved files.
+    """
+    import_path = filedialog.askopenfilename(filetypes=[('Zip File', '*.zip')])
+    if import_path != "":
+        with zipfile.ZipFile(import_path, 'r') as user_data_zip:
+            user_data_zip.extractall(pwd=past_version_number.encode())
+        messagebox.showinfo(message="User Data successfully loaded")
+        os.remove(import_path)
+    else:
+        messagebox.showinfo(message=" User data not loaded")
 
 
 
@@ -416,6 +462,7 @@ def store_data():
 
 
 
+
 def second_window():
     """
     Second window to show the added Master Plans, (by returning the name of the city from the CSV file in a list)
@@ -423,12 +470,14 @@ def second_window():
     """
 
     sec_win = Tk()
-    sec_win.geometry('480x178')
+    sec_win.geometry('480x198+18+18')
     sec_win.config(bg='#BAE2CD')
     select_csv = csv_selector()
     if select_csv == "E-Bikes_Master_Plan_links.csv":
         sec_win.title("Data Frame Viewer E-Bikes - List of Added Cities")
+        select_ID = 0
     else:
+        select_ID = 1
         sec_win.title("Data Frame Viewer Scooters - List of Added Cities")
     added_cities = pd.read_csv(select_csv)
     cities_list = added_cities.values.tolist()
@@ -439,6 +488,35 @@ def second_window():
     for x, y in enumerate(list_of_entries):
         listbox.insert(x, y)
     listbox.grid(row=0, column=0)
+
+    def remove_city():
+        try:
+            print(select_ID)
+
+            if select_ID == 1:
+                csv_df = pd.read_csv("Master_Plan_links.csv")
+            else:
+                csv_df = pd.read_csv("E-Bikes_Master_Plan_links.csv")
+
+            index = listbox.curselection()[0]
+            csv_df = csv_df.drop(index=index)
+            print(csv_df)
+            if select_ID == 1:
+                csv_df.to_csv(r'Master_Plan_links.csv', index=False)
+                sec_win.destroy()
+                second_window()
+            else:
+                csv_df.to_csv(r'E-Bikes_Master_Plan_links.csv', index=False)
+                sec_win.destroy()
+                second_window()
+        except IndexError:
+            messagebox.showerror(message="City List is empty, nothing to remove")
+
+
+    remove_button = Button(sec_win, text="Remove City", command=remove_city)
+    remove_button.grid(row=1, column=0)
+
+
 
 
 
@@ -451,7 +529,19 @@ Settings_ = True
 root = Tk()
 root.geometry("725x198+2+0")
 root.title("Project_M")
-root.config(bg='#BAE2CD')
+
+# Menubar
+menubar = Menu(root)
+filemenu = Menu(menubar, tearoff=1)
+filemenu.add_command(label="Import User Data", command=import_user_data)
+filemenu.add_command(label="Export User Data", command=save_user_data)
+filemenu.add_separator()
+menubar.add_cascade(label="File", menu=filemenu)
+
+root.config(bg='#BAE2CD', menu=menubar)
+
+
+
 #logo_file = 'Logo_.png'
 
 #define variables
@@ -521,7 +611,6 @@ def tick():
     browse_button.grid(row=3, column=3, padx=20, pady=0)
     dropdown.grid(row=3, column=2, padx=0, pady=10)
     scooter_ebike_dropdown.grid(row=4, column=2, padx=0, pady=10)
-
 
 root.createcommand('tkAboutDialog', about_dialog)
 Button_2 = Button(root, bg='#111111', fg='#111111', text=str(' ' * 2 + 'Edit Master Plan List' + ' ' * 2), command=BELOW_)
