@@ -23,6 +23,8 @@ import sys
 import pyminizip
 import os
 
+App_version = "2.0.5"
+App_code = "RDA1XC"
 
 try:
     df0 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/average_daily_active_vehicles_on_the_street.csv")
@@ -379,7 +381,9 @@ def update():
                     lytics_sheet = gc.open_by_key('1rOh6imkp-nLbnER4n-U7wQnEUhaaVmBZpilceUq56Zk')
                     Lytics_WS = lytics_sheet.worksheet('Data input')
                     cities_with_data = df0_rows-1
-                    Lytics_WS.insert_row([client_email,number_of_cities_linked,cities_passed, cities_with_data, dropdown_value, time_spent_on_update,now_date, now_time,switch],2)
+                    Lytics_WS.insert_row([client_email, number_of_cities_linked, cities_passed, cities_with_data,
+                                          dropdown_value, time_spent_on_update, now_date,
+                                          now_time, switch, App_version], 2)
                 except gspread.exceptions.APIError:
                     messagebox.showerror(message="Credentials are not valid for analytics")
                 messagebox.showinfo(message="Update successfull")
