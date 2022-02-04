@@ -22,9 +22,10 @@ import datetime
 import sys
 import pyminizip
 import os
+import semver
 
 App_version = "2.0.5"
-App_code = "RDA1XC"
+App_code = "ARDA2UX"
 
 try:
     df0 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/average_daily_active_vehicles_on_the_street.csv")
@@ -413,6 +414,33 @@ def update():
         except google.auth.exceptions.RefreshError:
             messagebox.showerror(message="Your credentials are not valid")
 
+def check_update():
+    """
+    Checks whether the user has the key, and reads the latest available App version from google sheets.
+    :returns: Compares the App version with the latest available version and returns the semver value.
+    """
+    try:
+        with open("credentials_path_container.yaml", mode='r') as cred_path_container:
+            cred_path = yaml.load(cred_path_container, Loader=yaml.FullLoader)
+            if cred_path  != "":
+                service_account_key = read_cread_filepath()
+                gc = gs.service_account(service_account_key)
+                lytics_sheet = gc.open_by_key('1rOh6imkp-nLbnER4n-U7wQnEUhaaVmBZpilceUq56Zk')
+                WS_Update = lytics_sheet.worksheet('UPDATE')
+                latest_available_version = ((WS_Update.get_values("A2")[0])[0])
+
+                return semver.compare(App_version, latest_available_version)
+
+            else:
+                "do nothing"
+    except ValueError as vr:
+        print(vr)
+    except gspread.exceptions.APIError as api_err:
+        print(api_err)
+    except yaml.parser.ParserError as yml_err:
+        print(yml_err)
+    except gspread.exceptions.NoValidUrlKeyFound as NoValidUrlKeyFound:
+        messagebox.showerror(message= NoValidUrlKeyFound)
 
 
 def csv_selector():
@@ -427,6 +455,7 @@ def csv_selector():
     else:
         select_csv = 'E-Bikes_Master_Plan_links.csv'
     return select_csv
+
 
 def store_data():
     acity_name = city_name.get()
@@ -461,9 +490,6 @@ def store_data():
         else:
             city_MP_link.set("")
             city_name.set("")
-
-
-
 
 
 def second_window():
@@ -519,14 +545,6 @@ def second_window():
     remove_button = Button(sec_win, text="Remove City", command=remove_city)
     remove_button.grid(row=1, column=0)
 
-
-
-
-
-
-
-
-
 Settings_ = True
 
 root = Tk()
@@ -542,8 +560,6 @@ filemenu.add_separator()
 menubar.add_cascade(label="File", menu=filemenu)
 
 root.config(bg='#BAE2CD', menu=menubar)
-
-
 
 #logo_file = 'Logo_.png'
 
@@ -614,6 +630,13 @@ def tick():
     browse_button.grid(row=3, column=3, padx=20, pady=0)
     dropdown.grid(row=3, column=2, padx=0, pady=10)
     scooter_ebike_dropdown.grid(row=4, column=2, padx=0, pady=10)
+    try:
+        if check_update() < 0:
+            messagebox.showinfo(message="Update available \n"
+                                "Export your user data before update!")
+            callback("https://drive.google.com/drive/folders/1UBO98m8vKMXLdJaL4Zw4nw0GjOMfEvMo?usp=sharing")
+    except TypeError as TypeErr:
+        print(TypeErr)
 
 root.createcommand('tkAboutDialog', about_dialog)
 Button_2 = Button(root, bg='#111111', fg='#111111', text=str(' ' * 2 + 'Edit Master Plan List' + ' ' * 2), command=BELOW_)
