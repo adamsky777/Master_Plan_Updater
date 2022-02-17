@@ -24,26 +24,59 @@ import pyminizip
 import os
 import semver
 
-App_version = "2.0.5"
-App_code = "ARDA2UX"
+App_version = "2.0.6"
+App_code = "ARDA2UXF"
 
-try:
-    df0 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/average_daily_active_vehicles_on_the_street.csv")
-#   gets the value of average number of scooter deployed
-    df0 = df0.fillna(float(0))
-    shape_df0 = df0.shape #  shape of df3 ( instance : tuple)
-    df0_rows = int(shape_df0[0])
-    #df_check = 1/int(df0_rows)
-except FileNotFoundError:
-    messagebox.showerror(message="the daily numbers for masterplan is not exsist in the downloads folder")
+
+def find_folders(path_to_dir, suffix=""):
+    """
+    lists all files in a specified Directory
+    :param path_to_dir: Path to the directory
+    :param suffix: criteria that the file ends with (in this case folder does not ends with anything)
+    :return: returns all the folders in a list
+    """
+    download_directory = os.path.expanduser(path_to_dir)
+    filenames = os.listdir(download_directory)
+    return [filename for filename in filenames if filename.endswith(suffix)]
+
+
+directory = '~/Downloads/'
+all_folders_list = find_folders(directory)
+
+folder_list = []
+for x in all_folders_list:
+    if "dashboard-daily_numbers_for_masterplan" in x:
+        folder_list.append(x)
+
+
+if len(folder_list) > 1:
+    messagebox.showerror(message="Duplicates found. Remove all the folders from your downloads folder named: "
+                                 "'dashboard-daily_numbers_for_masterplan'")
     sys.exit()
-#except ZeroDivisionError:
-    #messagebox.showerror(message="The CSV file does not contain any Cities")
-    #sys.exit()
+elif len(folder_list) == 0:
+    messagebox.showerror(message="Folder: 'dashboard-daily_numbers_for_masterplan' is missing from your downloads folder")
+    sys.exit()
+
+else:
+
+    try:
+        df0 = pd.read_csv(
+            "~/Downloads/dashboard-daily_numbers_for_masterplan/average_daily_active_vehicles_on_the_street.csv")
+        #   gets the value of average number of scooter deployed
+        df0 = df0.fillna(float(0))
+        shape_df0 = df0.shape  # shape of df3 ( instance : tuple)
+        df0_rows = int(shape_df0[0])
+        # df_check = 1/int(df0_rows)
+    except FileNotFoundError:
+        messagebox.showerror(message="the daily numbers for masterplan is not exsist in the downloads folder")
+        sys.exit()
+    # except ZeroDivisionError:
+    # messagebox.showerror(message="The CSV file does not contain any Cities")
+    # sys.exit()
 
 
 df1 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/average_daily_vehicles_with_1+_trips.csv")
-#gets the value of scooters with rides in respect of the corresponding city
+# gets the value of scooters with rides in respect of the corresponding city
 df1 = df1.fillna(float(0))
 shape_df1 = df1.shape
 
@@ -51,27 +84,25 @@ df2 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/rides.csv"
 df2 = df2.fillna(float(0))
 shape_df2 = df2.shape
 
-
 df3 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/gmv_from_passes.csv")
 # changes NaN values to €0.0
 df3 = df3.fillna("€0.0")
-shape_df3 = df3.shape #  shape of df3 ( instance : tuple)
+shape_df3 = df3.shape  # shape of df3 ( instance : tuple)
 df3_rows = int(shape_df3[0])
 
-
-    #retives  GMV without passes
+# retives  GMV without passes
 df4 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/gmv_(without_passes).csv")
 df4 = df4.fillna("0")
 shape_df4 = df4.shape
 
-#average order duration df5
+# average order duration df5
 df5 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/average_order_duration,_minutes.csv")
 df5 = df5.fillna("0")
-
 
 today = date.today()
 
 locker = "19StayHungryStayFoolish84"
+
 
 def save_user_data():
     """
@@ -83,18 +114,16 @@ def save_user_data():
     """
     save_path = filedialog.askdirectory()
     if save_path != "":
-        save_path = save_path+ "/user_data.zip"
+        save_path = save_path + "/user_data.zip"
         pyminizip.compress_multiple([os.path.join(os.getcwd(),
                                                   'downloads_path_container.yaml'),
                                      os.path.join(os.getcwd(), 'credentials_path_container.yaml'),
                                      os.path.join(os.getcwd(), 'E-Bikes_Master_Plan_links.csv'),
-                                                  os.path.join(os.getcwd(),'Master_Plan_links.csv')],
+                                     os.path.join(os.getcwd(), 'Master_Plan_links.csv')],
                                     [u'/', u'/', u'/', u'/'], save_path, locker, 0)
         messagebox.showinfo(message="User data saved")
     else:
         messagebox.showinfo(message=" User data not saved")
-
-
 
 
 def import_user_data():
@@ -113,7 +142,6 @@ def import_user_data():
         messagebox.showinfo(message=" User data not loaded")
 
 
-
 def get_date(day):
     """
     Get the index of the dropdown menu section.
@@ -129,7 +157,6 @@ def get_date(day):
     return timehorizon
 
 
-
 def replacesign(a):
     """
     Replaces removes comma, to normalize values and converts to float
@@ -141,6 +168,7 @@ def replacesign(a):
     a = float(a)
     return a
 
+
 def replaceEuro(b):
     """
     Removes euro sign to work normalize the string and converts to float.
@@ -151,6 +179,7 @@ def replaceEuro(b):
     b = b.replace("€", "")
     b = float(b)
     return b
+
 
 def zeroeuro(city_GMV_passes):
     """
@@ -164,6 +193,7 @@ def zeroeuro(city_GMV_passes):
     else:
         "do nothing"
     return city_GMV_passes
+
 
 def zerocomma(city_GMV_without_passes):
     """
@@ -179,7 +209,6 @@ def zerocomma(city_GMV_without_passes):
     return city_GMV_without_passes
 
 
-
 def retrieve_values(df, city):
     """
     Retruns the values from the dataframes that mathces with the conditions.
@@ -192,9 +221,9 @@ def retrieve_values(df, city):
     MP_links_df = pd.read_csv(select_csv)
     all_cities_list = MP_links_df['CityName'].values.tolist()
     """∆- ed the Dynamic Timeframe to the first row since, it is not standardized by looker (For ex: Slovakia)"""
-    #df_first_col = df[:, 1].values.tolist()
+    # df_first_col = df[:, 1].values.tolist()
     df_first_col = df.iloc[:, 1].tolist()
-    #df_first_col = df['Dynamic Timeframe'].values.tolist()
+    # df_first_col = df['Dynamic Timeframe'].values.tolist()
     active_cities_list = [i for i in all_cities_list if i in df_first_col]
     cities_indexes = [df_first_col.index(x) for x in active_cities_list]
     cities_dictionary = dict(zip(active_cities_list, cities_indexes))
@@ -206,18 +235,16 @@ def retrieve_values(df, city):
     return values
 
 
-
 # column B to C ∆ ed to match with new MP style and criteria names
 def MP_row_value(MP_Sheet):
     MP_column_A_data = MP_Sheet.values_batch_get('Daily!C:C').get('valueRanges')
     MP_column_A_list = MP_column_A_data[0]
     MP_column_A_list = MP_column_A_list.get('values')
-    crit =['Active supply (on street)'], ['Rides'], ['Ridden vehicles'], ['Revenue'], ['Ride Duration (minutes)']
+    crit = ['Active supply (on street)'], ['Rides'], ['Ridden vehicles'], ['Revenue'], ['Ride Duration (minutes)']
     row_list = [i for i in crit if i in MP_column_A_list]
     row_indexes = [MP_column_A_list.index(x) for x in row_list]
-    row_indexes = [x+1 for x in row_indexes]
+    row_indexes = [x + 1 for x in row_indexes]
     return row_indexes
-
 
 
 def MP_column_value(MP_Sheet):
@@ -240,9 +267,10 @@ def open_downloads_folder_path():
     if downloads_folder_path != "":
         search_value = re.search('dashboard-daily_numbers_for_masterplan', downloads_folder_path)
         try:
-            if search_value[0] =='dashboard-daily_numbers_for_masterplan':
+            if search_value[0] == 'dashboard-daily_numbers_for_masterplan':
                 print(downloads_folder_path)
-                messagebox_result = messagebox.askquestion(title="Submit", message="This folder will be removed after update. Are you sure?")
+                messagebox_result = messagebox.askquestion(title="Submit",
+                                                           message="This folder will be removed after update. Are you sure?")
                 if messagebox_result == "yes":
                     with open("downloads_path_container.yaml", mode='w') as downloads_folder_path_container:
                         yaml.dump(downloads_folder_path, downloads_folder_path_container, indent=2)
@@ -254,7 +282,7 @@ def open_downloads_folder_path():
                 messagebox.showerror("You selected a wrong folder")
         except TypeError:
             messagebox.showerror(message="Folder does not match \n"
-            "must be called 'dashboard-daily_numbers_for_masterplan'")
+                                         "must be called 'dashboard-daily_numbers_for_masterplan'")
     else:
         messagebox.showinfo(message="target folder NOT added")
 
@@ -271,11 +299,11 @@ def read_downloads_folder_path():
             print(downloads_folder_path)
             return downloads_folder_path
 
-    #except FileNotFoundError:
-        #messagebox.showerror(message="folder 'daily_numbers_for_masterplan' 's missing \n"
-                                     #"To add: Click Target folder")
-        #downloads_folder_path = ""
-       # return downloads_folder_path
+    # except FileNotFoundError:
+    # messagebox.showerror(message="folder 'daily_numbers_for_masterplan' 's missing \n"
+    # "To add: Click Target folder")
+    # downloads_folder_path = ""
+    # return downloads_folder_path
     except yaml.YAMLError:
         messagebox.showerror(message="folder 'daily_numbers_for_masterplan' 's missing \n"
                                      "To add: Click Target folder")
@@ -283,17 +311,16 @@ def read_downloads_folder_path():
         return downloads_folder_path
 
 
-
-
 def open_cred_filepath():
     cred_filepath = filedialog.askopenfilename(filetypes=[("JSON file", "*.json")])
     print(cred_filepath)
     if cred_filepath != "":
         with open("credentials_path_container.yaml", mode='w') as cred_path_container:
-            yaml.dump(cred_filepath,cred_path_container,indent=2)
+            yaml.dump(cred_filepath, cred_path_container, indent=2)
             messagebox.showinfo(message="credentials loaded")
     else:
         messagebox.showinfo(message="credentials NOT loaded")
+
 
 def read_cread_filepath():
     try:
@@ -373,7 +400,7 @@ def update():
                 time_spent_on_update = end_timer - start_timer
                 dropdown_value = timeback.get()
                 now_time = datetime.datetime.now()
-                now_date =now_time.strftime('%Y-%m-%d')
+                now_date = now_time.strftime('%Y-%m-%d')
                 now_time = now_time.strftime('%H:%M:%S')
                 with open(service_account_key, 'r') as service_account_json:
                     service_account_data = json.load(service_account_json)
@@ -381,7 +408,7 @@ def update():
                 try:
                     lytics_sheet = gc.open_by_key('1rOh6imkp-nLbnER4n-U7wQnEUhaaVmBZpilceUq56Zk')
                     Lytics_WS = lytics_sheet.worksheet('Data input')
-                    cities_with_data = df0_rows-1
+                    cities_with_data = df0_rows - 1
                     Lytics_WS.insert_row([client_email, number_of_cities_linked, cities_passed, cities_with_data,
                                           dropdown_value, time_spent_on_update, now_date,
                                           now_time, switch, App_version], 2)
@@ -396,23 +423,24 @@ def update():
 
         except gspread.exceptions.NoValidUrlKeyFound:
             messagebox.showerror(message="URL error  \n "
-                                     "You need to Clear city list, and Add valid URLs")
+                                         "You need to Clear city list, and Add valid URLs")
         except gspread.exceptions.APIError:
-            messagebox.showerror(message="Permission denied,\n " 
+            messagebox.showerror(message="Permission denied,\n "
                                          "your credentials does not have the right accesses. Contact the administrator")
-#Added a new line here to exit when the user does not have the right permission
-# TODO: (NEEDS TO BE TESTED)
+            # Added a new line here to exit when the user does not have the right permission
+            # TODO: (NEEDS TO BE TESTED)
             sys.exit()
         except FileNotFoundError as file_err:
             file_err = "File is missing or has been moved ", file_err
-            messagebox.showerror(message=file_err,)
+            messagebox.showerror(message=file_err, )
         except KeyError as keyerr:
             keyerr = "Key error  \n " "You need to Clear city list", keyerr
-            messagebox.showerror(message=keyerr )
+            messagebox.showerror(message=keyerr)
         except ValueError:
             messagebox.showerror(message="keys.JSON is missing, Please load credentials or contact the administrator")
         except google.auth.exceptions.RefreshError:
             messagebox.showerror(message="Your credentials are not valid")
+
 
 def check_update():
     """
@@ -422,7 +450,7 @@ def check_update():
     try:
         with open("credentials_path_container.yaml", mode='r') as cred_path_container:
             cred_path = yaml.load(cred_path_container, Loader=yaml.FullLoader)
-            if cred_path  != "":
+            if cred_path != "":
                 service_account_key = read_cread_filepath()
                 gc = gs.service_account(service_account_key)
                 lytics_sheet = gc.open_by_key('1rOh6imkp-nLbnER4n-U7wQnEUhaaVmBZpilceUq56Zk')
@@ -440,7 +468,7 @@ def check_update():
     except yaml.parser.ParserError as yml_err:
         print(yml_err)
     except gspread.exceptions.NoValidUrlKeyFound as NoValidUrlKeyFound:
-        messagebox.showerror(message= NoValidUrlKeyFound)
+        messagebox.showerror(message=NoValidUrlKeyFound)
 
 
 def csv_selector():
@@ -469,24 +497,24 @@ def store_data():
     else:
         messagebox_results = messagebox.askquestion(title="Submit", message="Are you ready to submit?")
         if messagebox_results == "yes":
-           print(acity_link, acity_name)
-           city_url = "'" + acity_link + "'"
-           City_Name_URL_Dict = {'CityName': [acity_name],
-                                 'cityURL': [city_url]}
-           df_city_URL = pd.DataFrame(City_Name_URL_Dict)
-           select_csv = csv_selector()
-           df_city_URL.to_csv(select_csv, mode='a', header=False, index=False)
-           df_city_name_test = pd.read_csv(select_csv)
-           column_values_list = df_city_name_test['CityName'].tolist()
-           criteria = acity_name in column_values_list
-           print(criteria)
-           if criteria == True:
-               messagebox.showinfo(message="Values Added")
-               city_MP_link.set("")
-               city_name.set("")
-           else:
+            print(acity_link, acity_name)
+            city_url = "'" + acity_link + "'"
+            City_Name_URL_Dict = {'CityName': [acity_name],
+                                  'cityURL': [city_url]}
+            df_city_URL = pd.DataFrame(City_Name_URL_Dict)
+            select_csv = csv_selector()
+            df_city_URL.to_csv(select_csv, mode='a', header=False, index=False)
+            df_city_name_test = pd.read_csv(select_csv)
+            column_values_list = df_city_name_test['CityName'].tolist()
+            criteria = acity_name in column_values_list
+            print(criteria)
+            if criteria == True:
+                messagebox.showinfo(message="Values Added")
+                city_MP_link.set("")
+                city_name.set("")
+            else:
                 messagebox.showerror(message="Value error  \n "
-                                                "You need to Clear city list first")
+                                             "You need to Clear city list first")
         else:
             city_MP_link.set("")
             city_name.set("")
@@ -541,9 +569,9 @@ def second_window():
         except IndexError:
             messagebox.showerror(message="City List is empty, nothing to remove")
 
-
     remove_button = Button(sec_win, text="Remove City", command=remove_city)
     remove_button.grid(row=1, column=0)
+
 
 Settings_ = True
 
@@ -561,9 +589,9 @@ menubar.add_cascade(label="File", menu=filemenu)
 
 root.config(bg='#BAE2CD', menu=menubar)
 
-#logo_file = 'Logo_.png'
+# logo_file = 'Logo_.png'
 
-#define variables
+# define variables
 city_name = StringVar()
 city_MP_link = StringVar()
 cred_key = StringVar()
@@ -575,10 +603,10 @@ boxvar = BooleanVar()
 scooter_ebike.set("Scooters")
 scooter_ebike_dropdown_options = ["Scooters", "E-bikes"]
 
-def BELOW_ ():
 
+def BELOW_():
     global Settings_
-    if Settings_== False:
+    if Settings_ == False:
         root.geometry("725x198+2+0")
         Settings_ = True
     else:
@@ -605,22 +633,25 @@ def csvGenerate_():
 def callback(url):
     webbrowser.open_new_tab(url)
 
+
 def about_dialog():
     root.tk.call('tk::mac::standardAboutPanel')
 
+
 def tick():
-    Txt = Label(text = "Master Plan Updater", font=("helvetica", 25, "bold",), bg=("#BAE2CD"))
-    dev = Label(text ="@Adam Torkos",font=("helvetica",12), bg=("#BAE2CD"), cursor="hand2")
-    dev.bind("<Button-1>", lambda e: callback("mailto:adam.torkos@bolt.eu?cc=adam.torkos@me.com&subject=Master%20Plan%20Updater"))
+    Txt = Label(text="Master Plan Updater", font=("helvetica", 25, "bold",), bg=("#BAE2CD"))
+    dev = Label(text="@Adam Torkos", font=("helvetica", 12), bg=("#BAE2CD"), cursor="hand2")
+    dev.bind("<Button-1>",
+             lambda e: callback("mailto:adam.torkos@bolt.eu?cc=adam.torkos@me.com&subject=Master%20Plan%20Updater"))
     Txt.grid(row=1, column=1)
     dev.grid(row=1, column=3)
     Button_1.grid(row=2, column=2, sticky=E, padx=10)
     Button_2.grid(row=2, column=3, sticky=E, padx=10)
     Button_3.grid(row=3, column=1, padx=10, pady=10)
-    lbl_city = Label(text="Enter city Name",font=("helvetica", 12, "italic",), bg=("#BAE2CD"))
+    lbl_city = Label(text="Enter city Name", font=("helvetica", 12, "italic",), bg=("#BAE2CD"))
     lbl_city.grid(row=8, column=2)
     entry_city.grid(row=8, column=3)
-    lbl_link = Label(text="Enter MP's link here",font=("helvetica", 12, "italic",), bg=("#BAE2CD"))
+    lbl_link = Label(text="Enter MP's link here", font=("helvetica", 12, "italic",), bg=("#BAE2CD"))
     lbl_link.grid(row=9, column=2)
     entry_link.grid(row=9, column=3)
     Button_Store.grid(row=10, column=3, padx=10)
@@ -633,21 +664,25 @@ def tick():
     try:
         if check_update() < 0:
             messagebox.showinfo(message="Update available \n"
-                                "Export your user data before update!")
+                                        "Export your user data before update!")
             callback("https://drive.google.com/drive/folders/1UBO98m8vKMXLdJaL4Zw4nw0GjOMfEvMo?usp=sharing")
     except TypeError as TypeErr:
         print(TypeErr)
 
+
 root.createcommand('tkAboutDialog', about_dialog)
-Button_2 = Button(root, bg='#111111', fg='#111111', text=str(' ' * 2 + 'Edit Master Plan List' + ' ' * 2), command=BELOW_)
+Button_2 = Button(root, bg='#111111', fg='#111111', text=str(' ' * 2 + 'Edit Master Plan List' + ' ' * 2),
+                  command=BELOW_)
 Button_1 = Button(root, fg='#111111', text=str(' ' * 2 + 'Update Master Plans' + ' ' * 2), command=run)
 Button_3 = Button(root, fg='#111111', text=str(' ' * 2 + 'Clear city List' + ' ' * 2), command=csvGenerate_)
 Button_Store = Button(root, fg='#111111', text=str(' ' * 2 + 'Store Data' + ' ' * 2), command=store_data)
 entry_city = Entry(root, fg='#111111', textvariable=city_name)
 entry_link = Entry(root, fg='#111111', textvariable=city_MP_link)
 progress_bar = tkinter.ttk.Progressbar(root, orient=HORIZONTAL, length=300, mode='determinate')
-Button_downloads_folder = Button(root , fg='#111111', text=str(' ' * 2 + 'Target folder' + ' ' * 2),command=open_downloads_folder_path)
-open_credentials = Button(root, fg='#111111', text=str(' ' * 2 + 'Load credentials' + ' ' * 2), command=open_cred_filepath)
+Button_downloads_folder = Button(root, fg='#111111', text=str(' ' * 2 + 'Target folder' + ' ' * 2),
+                                 command=open_downloads_folder_path)
+open_credentials = Button(root, fg='#111111', text=str(' ' * 2 + 'Load credentials' + ' ' * 2),
+                          command=open_cred_filepath)
 row_button = Button(root, fg='#111111', text=str(' ' * 2 + 'row test' + ' ' * 2), command=MP_row_value)
 browse_button = Button(root, fg='#111111', text=str(' ' * 2 + 'Browse city list' + ' ' * 2), command=second_window)
 dropdown = OptionMenu(root, timeback, *dropdown_options)
