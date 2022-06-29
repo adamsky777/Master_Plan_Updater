@@ -24,8 +24,8 @@ import pyminizip
 import os
 import semver
 
-App_version = "2.0.6"
-App_code = "ARDA2UXF"
+App_version = "2.1.2"
+App_code = "CDSC290A"
 
 
 def find_folders(path_to_dir, suffix=""):
@@ -99,14 +99,30 @@ shape_df4 = df4.shape
 df5 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/average_order_duration,_minutes.csv")
 df5 = df5.fillna("0")
 
+# battery swaps df6
+df6 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/battery_swaps_by_3pl.csv")
+df6 = df6.fillna("0")
+
+# collected df7
+df7 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/collected_by_3pl.csv")
+df7 = df7.fillna("0")
+
+# deployed df8
+df8 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/deployed_by_3pl.csv")
+df8 = df8.fillna("0")
+
 today = date.today()
 
 locker = "19StayHungryStayFoolish84"
 
 
+with open("coll_dep_swap_container.yaml", mode='r') as coll_dep_swap_container:
+    cb_var_yaml = yaml.load(coll_dep_swap_container, Loader=yaml.FullLoader)
+
+
 def save_user_data():
     """
-    Creates an an encrypted zip file of the user data, if a user has 20-30 or even more cities, it might become time
+    Creates an encrypted zip file of the user data, if a user has 20-30 or even more cities, it might become time
     consuming to add the cities to the list again.
     The encrypted zip file contains all the previously saved data of the user.
     User can choose where to save the file and the save option is available from the menu bar.
@@ -140,6 +156,41 @@ def import_user_data():
         os.remove(import_path)
     else:
         messagebox.showinfo(message=" User data not loaded")
+
+
+def save_city_data():
+    """
+    Creates an encrypted zip file containing the city list both for scooters and ebikes.
+    The encrypted zip file only contains the data of the city lists, excluding the user data.
+    Hence, users can circulate the zip file if they have 20-40 cities. So new members don't need to add the cities again.
+    :return: The encrypted zip file.
+    """
+    save_path = filedialog.askdirectory()
+    if save_path != "":
+        save_path = save_path + "/city_data.zip"
+        pyminizip.compress_multiple([
+                                     os.path.join(os.getcwd(), 'E-Bikes_Master_Plan_links.csv'),
+                                     os.path.join(os.getcwd(), 'Master_Plan_links.csv')],
+                                    [u'/', u'/'], save_path, locker, 0)
+        messagebox.showinfo(message="City data saved")
+    else:
+        messagebox.showinfo(message=" City data not saved")
+
+
+def import_city_data():
+    """
+    Loads the City data from the encrypted zip file.
+    User can load the data from the menu bar.
+    :returns: Replaces the program's default files by the the previously saved files.
+    """
+    import_path = filedialog.askopenfilename(filetypes=[('Zip File', '*.zip')])
+    if import_path != "":
+        with zipfile.ZipFile(import_path, 'r') as city_data_zip:
+            city_data_zip.extractall(pwd=locker.encode())
+        messagebox.showinfo(message="City Data successfully loaded")
+        os.remove(import_path)
+    else:
+        messagebox.showinfo(message=" City data not loaded")
 
 
 def get_date(day):
@@ -177,6 +228,7 @@ def replaceEuro(b):
     """
 
     b = b.replace("€", "")
+    b = b.replace(",", "")
     b = float(b)
     return b
 
@@ -240,7 +292,8 @@ def MP_row_value(MP_Sheet):
     MP_column_A_data = MP_Sheet.values_batch_get('Daily!C:C').get('valueRanges')
     MP_column_A_list = MP_column_A_data[0]
     MP_column_A_list = MP_column_A_list.get('values')
-    crit = ['Active supply (on street)'], ['Rides'], ['Ridden vehicles'], ['Revenue'], ['Ride Duration (minutes)']
+    crit = ['Active supply (on street)'], ['Rides'], ['Ridden vehicles'], ['Revenue'], ['Ride Duration (minutes)'], [
+        '3PL # collected tasks fulfilled'], ['3PL # deployed tasks fulfilled'], ['3PL # swapped tasks fulfilled']
     row_list = [i for i in crit if i in MP_column_A_list]
     row_indexes = [MP_column_A_list.index(x) for x in row_list]
     row_indexes = [x + 1 for x in row_indexes]
@@ -347,6 +400,8 @@ def run():
 
 
 def update():
+    coll_dep_swap = cb_var.get()
+
     switch = scooter_ebike.get()
     select_csv = csv_selector()
     cities_passed = 0
@@ -377,6 +432,9 @@ def update():
                     city_GMV_without_passes = zerocomma(city_GMV_without_passes)
                     city_GMV = replacesign(city_GMV_without_passes) + replaceEuro(city_GMV_passes)
                     ride_duration = retrieve_values(df5, CITY_NAME)
+                    swapped_tasks = retrieve_values(df6, CITY_NAME)
+                    collected_tasks = retrieve_values(df7, CITY_NAME)
+                    deployed_tasks = retrieve_values(df8, CITY_NAME)
                     print(CITY_URL)
                     MP_sheet = gc.open_by_url(CITY_URL)
                     column_value = MP_column_value(MP_sheet)
@@ -389,6 +447,12 @@ def update():
                     MP_WS.update_cell(row_value[2], column_value, scooters_with_rides)
                     MP_WS.update_cell(row_value[3], column_value, city_GMV)
                     MP_WS.update_cell(row_value[4], column_value, ride_duration)
+                    if coll_dep_swap == 1:
+                        MP_WS.update_cell(row_value[5], column_value, collected_tasks)
+                        MP_WS.update_cell(row_value[6], column_value, deployed_tasks)
+                        MP_WS.update_cell(row_value[7], column_value, swapped_tasks)
+                    else:
+                        "do nothing"
                     """
                     Row value[x] is always the th elemnt in list "crit"
                     """
@@ -402,6 +466,8 @@ def update():
                 now_time = datetime.datetime.now()
                 now_date = now_time.strftime('%Y-%m-%d')
                 now_time = now_time.strftime('%H:%M:%S')
+                with open("coll_dep_swap_container.yaml", mode='w') as coll_dep_swap_container:
+                    yaml.dump(coll_dep_swap, coll_dep_swap_container, indent=2)
                 with open(service_account_key, 'r') as service_account_json:
                     service_account_data = json.load(service_account_json)
                     client_email = service_account_data['client_email']
@@ -436,8 +502,9 @@ def update():
         except KeyError as keyerr:
             keyerr = "Key error  \n " "You need to Clear city list", keyerr
             messagebox.showerror(message=keyerr)
-        except ValueError:
-            messagebox.showerror(message="keys.JSON is missing, Please load credentials or contact the administrator")
+        except ValueError as Val_err:
+            Val_err = "Value error", Val_err
+            messagebox.showerror(message= Val_err)
         except google.auth.exceptions.RefreshError:
             messagebox.showerror(message="Your credentials are not valid")
 
@@ -584,6 +651,8 @@ menubar = Menu(root)
 filemenu = Menu(menubar, tearoff=1)
 filemenu.add_command(label="Import User Data", command=import_user_data)
 filemenu.add_command(label="Export User Data", command=save_user_data)
+filemenu.add_command(label="Import City List", command=import_city_data)
+filemenu.add_command(lable="Export City List", command=save_city_data)
 filemenu.add_separator()
 menubar.add_cascade(label="File", menu=filemenu)
 
@@ -598,10 +667,11 @@ cred_key = StringVar()
 timeback = StringVar()
 scooter_ebike = StringVar()
 timeback.set("t-1")
-dropdown_options = ["t-1", "t-2", "t-3", "t-4"]
+dropdown_options = ["t-1", "t-2", "t-3", "t-4", "t-5", "t-6", "t-7"]
 boxvar = BooleanVar()
 scooter_ebike.set("Scooters")
 scooter_ebike_dropdown_options = ["Scooters", "E-bikes"]
+
 
 
 def BELOW_():
@@ -661,6 +731,8 @@ def tick():
     browse_button.grid(row=3, column=3, padx=20, pady=0)
     dropdown.grid(row=3, column=2, padx=0, pady=10)
     scooter_ebike_dropdown.grid(row=4, column=2, padx=0, pady=10)
+    cb.grid(column=3, row=4)
+
     try:
         if check_update() < 0:
             messagebox.showinfo(message="Update available \n"
@@ -684,9 +756,16 @@ Button_downloads_folder = Button(root, fg='#111111', text=str(' ' * 2 + 'Target 
 open_credentials = Button(root, fg='#111111', text=str(' ' * 2 + 'Load credentials' + ' ' * 2),
                           command=open_cred_filepath)
 row_button = Button(root, fg='#111111', text=str(' ' * 2 + 'row test' + ' ' * 2), command=MP_row_value)
-browse_button = Button(root, fg='#111111', text=str(' ' * 2 + 'Browse city list' + ' ' * 2), command=second_window)
+browse_button = Button(root, fg='#111111', text=str(' ' * 2 + 'View city list' + ' ' * 2), command=second_window)
 dropdown = OptionMenu(root, timeback, *dropdown_options)
 scooter_ebike_dropdown = OptionMenu(root, scooter_ebike, *scooter_ebike_dropdown_options)
+cb_var = IntVar()
+if cb_var_yaml == 0:
+    cb_var.set(0)
+else:
+    cb_var.set(1)
+cb = Checkbutton(root, text="Coll.Dep.Swap", variable=cb_var, onvalue=1, offvalue=0)
+
 
 tick()
 root.mainloop()
