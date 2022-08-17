@@ -23,9 +23,16 @@ import sys
 import pyminizip
 import os
 import semver
+#from tkhtmlview import HTMLLabel
+from tkinterweb import HtmlLabel
 
-App_version = "2.0.6"
-App_code = "ARDA2UXF"
+from tkinterhtml import HtmlFrame
+#from signal import signal, SIGPIPE, SIG_DFL
+#Ignore SIG_PIPE and don't throw exceptions on it... (http://docs.python.org/library/signal.html)
+#signal(SIGPIPE, SIG_DFL)
+
+App_version = "2.1.3"
+App_code = "BPFWPA1207A"
 
 
 def find_folders(path_to_dir, suffix=""):
@@ -39,6 +46,11 @@ def find_folders(path_to_dir, suffix=""):
     filenames = os.listdir(download_directory)
     return [filename for filename in filenames if filename.endswith(suffix)]
 
+empty_df = {
+        'Dynamic Timeframe':[],
+               'Time': []
+               }
+missing_log = []
 
 directory = '~/Downloads/'
 all_folders_list = find_folders(directory)
@@ -48,11 +60,20 @@ for x in all_folders_list:
     if "dashboard-daily_numbers_for_masterplan" in x:
         folder_list.append(x)
 
-
 if len(folder_list) > 1:
     messagebox.showerror(message="Duplicates found. Remove all the folders from your downloads folder named: "
                                  "'dashboard-daily_numbers_for_masterplan'")
-    sys.exit()
+    duplicates_question = messagebox.askquestion(message="Do you want to remove the duplicates?")
+    if duplicates_question == "yes":
+        for i in folder_list:
+            shutil.rmtree(os.path.expanduser("~")+"/Downloads/"+i)
+
+        sys.exit()
+    else:
+        sys.exit()
+
+
+
 elif len(folder_list) == 0:
     messagebox.showerror(message="Folder: 'dashboard-daily_numbers_for_masterplan' is missing from your downloads folder")
     sys.exit()
@@ -74,39 +95,101 @@ else:
     # messagebox.showerror(message="The CSV file does not contain any Cities")
     # sys.exit()
 
+    try:
+        df1 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/average_daily_vehicles_with_1+_trips.csv")
+        # gets the value of scooters with rides in respect of the corresponding city
+        df1 = df1.fillna(float(0))
+        shape_df1 = df1.shape
+    except FileNotFoundError:
+        df1 = pd.DataFrame(empty_df)
+        missing_log.append("average_daily_vehicles_with_1+_trips.csv")
 
-df1 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/average_daily_vehicles_with_1+_trips.csv")
-# gets the value of scooters with rides in respect of the corresponding city
-df1 = df1.fillna(float(0))
-shape_df1 = df1.shape
+    try:
+        df2 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/rides.csv")
+        df2 = df2.fillna(float(0))
+        shape_df2 = df2.shape
+    except FileNotFoundError:
+        df2 = pd.DataFrame(empty_df)
+        missing_log.append("rides.csv")
 
-df2 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/rides.csv")
-df2 = df2.fillna(float(0))
-shape_df2 = df2.shape
+    try:
+        # GMV from PASSES
+        df3 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/gmv_from_passes.csv")
+        # changes NaN values to €0.0
+        df3 = df3.fillna("€0.0")
+        shape_df3 = df3.shape  # shape of df3 ( instance : tuple)
+        df3_rows = int(shape_df3[0])
+    except FileNotFoundError:
+        df3 = pd.DataFrame(empty_df)
+        missing_log.append("gmv_from_passes.csv")
 
-df3 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/gmv_from_passes.csv")
-# changes NaN values to €0.0
-df3 = df3.fillna("€0.0")
-shape_df3 = df3.shape  # shape of df3 ( instance : tuple)
-df3_rows = int(shape_df3[0])
+    try:
+        # GMV without passes
+        df4 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/gmv_(without_passes).csv")
+        df4 = df4.fillna("0")
+        shape_df4 = df4.shape
+    except FileNotFoundError:
+        df4 = pd.DataFrame(empty_df)
+        missing_log.append("gmv_(without_passes).csv")
 
-# retives  GMV without passes
-df4 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/gmv_(without_passes).csv")
-df4 = df4.fillna("0")
-shape_df4 = df4.shape
+    try:
+        # average order duration df5
+        df5 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/average_order_duration,_minutes.csv")
+        df5 = df5.fillna("0")
+    except FileNotFoundError:
+        df5 = pd.DataFrame(empty_df)
+        missing_log.append("average_order_duration_minutes.csv")
 
-# average order duration df5
-df5 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/average_order_duration,_minutes.csv")
-df5 = df5.fillna("0")
+    try:
+        # battery swaps df6
+        df6 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/battery_swaps_by_3pl.csv")
+        df6 = df6.fillna("0")
+    except FileNotFoundError:
+        df6 = pd.DataFrame(empty_df)
+        missing_log.append("battery_swaps_by_3pl.csv")
+
+    try:
+        # collected df7
+        df7 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/collected_by_3pl.csv")
+        df7 = df7.fillna("0")
+    except FileNotFoundError:
+        df7 = pd.DataFrame(empty_df)
+        missing_log.append("collected_by_3pl.csv")
+
+    try:
+        # deployed df8
+        df8 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/deployed_by_3pl.csv")
+        df8 = df8.fillna("0")
+    except FileNotFoundError:
+        df8 = pd.DataFrame(empty_df)
+        missing_log.append("deployed_by_3pl.csv")
+
+    try:
+        # Waiting for parts
+        """Note that csv of WP has different style, so inserting a row to the left achieves the same look 
+            -> we can use the same iteration """
+        df9 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/vehicles_waiting_for_parts.csv")
+        df9.insert(loc=0, column="Num", value=0)
+        df9 = df9.fillna("0")
+    except FileNotFoundError:
+        df9 = pd.DataFrame(empty_df)
+        missing_log.append("vehicles_waiting_for_parts.csv")
+
+missing_log = [i +", " for i in missing_log]
+missing_log ="".join(str(i) for i in missing_log)
 
 today = date.today()
-
+print(missing_log)
 locker = "19StayHungryStayFoolish84"
+
+
+with open("coll_dep_swap_container.yaml", mode='r') as coll_dep_swap_container:
+    cb_var_yaml = yaml.load(coll_dep_swap_container, Loader=yaml.FullLoader)
 
 
 def save_user_data():
     """
-    Creates an an encrypted zip file of the user data, if a user has 20-30 or even more cities, it might become time
+    Creates an encrypted zip file of the user data, if a user has 20-30 or even more cities, it might become time
     consuming to add the cities to the list again.
     The encrypted zip file contains all the previously saved data of the user.
     User can choose where to save the file and the save option is available from the menu bar.
@@ -140,6 +223,41 @@ def import_user_data():
         os.remove(import_path)
     else:
         messagebox.showinfo(message=" User data not loaded")
+
+
+def save_city_data():
+    """
+    Creates an encrypted zip file containing the city list both for scooters and ebikes.
+    The encrypted zip file only contains the data of the city lists, excluding the user data.
+    Hence, users can circulate the zip file if they have 20-40 cities. So new members don't need to add the cities again.
+    :return: The encrypted zip file.
+    """
+    save_path = filedialog.askdirectory()
+    if save_path != "":
+        save_path = save_path + "/city_data.zip"
+        pyminizip.compress_multiple([
+                                     os.path.join(os.getcwd(), 'E-Bikes_Master_Plan_links.csv'),
+                                     os.path.join(os.getcwd(), 'Master_Plan_links.csv')],
+                                    [u'/', u'/'], save_path, locker, 0)
+        messagebox.showinfo(message="City data saved")
+    else:
+        messagebox.showinfo(message="City data not saved")
+
+
+def import_city_data():
+    """
+    Loads the City data from the encrypted zip file.
+    User can load the data from the menu bar.
+    :returns: Replaces the program's default files by the the previously saved files.
+    """
+    import_path = filedialog.askopenfilename(filetypes=[('Zip File', '*.zip')])
+    if import_path != "":
+        with zipfile.ZipFile(import_path, 'r') as city_data_zip:
+            city_data_zip.extractall(pwd=locker.encode())
+        messagebox.showinfo(message="City Data successfully loaded")
+        os.remove(import_path)
+    else:
+        messagebox.showinfo(message=" City data not loaded")
 
 
 def get_date(day):
@@ -177,6 +295,7 @@ def replaceEuro(b):
     """
 
     b = b.replace("€", "")
+    b = b.replace(",", "")
     b = float(b)
     return b
 
@@ -211,10 +330,10 @@ def zerocomma(city_GMV_without_passes):
 
 def retrieve_values(df, city):
     """
-    Retruns the values from the dataframes that mathces with the conditions.
+    Returns the values from the dataframes that mathces with the conditions.
     :param df: dataframe generated by panda from the csv files.
     :param city: A city from the added cities list.
-    :returns: the coressponding value from the datafram that mathces with the city
+    :returns: the corresponding value from the dataframe that matches with the city
     """
 
     select_csv = csv_selector()
@@ -223,7 +342,7 @@ def retrieve_values(df, city):
     """∆- ed the Dynamic Timeframe to the first row since, it is not standardized by looker (For ex: Slovakia)"""
     # df_first_col = df[:, 1].values.tolist()
     df_first_col = df.iloc[:, 1].tolist()
-    # df_first_col = df['Dynamic Timeframe'].values.tolist()
+     # df_first_col = df['Dynamic Timeframe'].values.tolist()
     active_cities_list = [i for i in all_cities_list if i in df_first_col]
     cities_indexes = [df_first_col.index(x) for x in active_cities_list]
     cities_dictionary = dict(zip(active_cities_list, cities_indexes))
@@ -240,7 +359,9 @@ def MP_row_value(MP_Sheet):
     MP_column_A_data = MP_Sheet.values_batch_get('Daily!C:C').get('valueRanges')
     MP_column_A_list = MP_column_A_data[0]
     MP_column_A_list = MP_column_A_list.get('values')
-    crit = ['Active supply (on street)'], ['Rides'], ['Ridden vehicles'], ['Revenue'], ['Ride Duration (minutes)']
+    crit = ['Active supply (on street)'], ['Rides'], ['Ridden vehicles'], ['Revenue'], ['Ride Duration (minutes)'], [
+        '3PL # collected tasks fulfilled'], ['3PL # deployed tasks fulfilled'], ['3PL # swapped tasks fulfilled'], \
+           ["Waiting for parts"]
     row_list = [i for i in crit if i in MP_column_A_list]
     row_indexes = [MP_column_A_list.index(x) for x in row_list]
     row_indexes = [x + 1 for x in row_indexes]
@@ -346,9 +467,34 @@ def run():
     t1.start()
 
 
-def update():
+def mulitplier_selection():
     switch = scooter_ebike.get()
+    if switch == "Scooters":
+        multiplier = 1
+    else:
+        multiplier = 0
+    return multiplier
+
+
+def empty_csv():
+    if len(missing_log) != 0:
+        missing_csv_message = "CSV file(s) missing from Daily numbers for masterplan " + missing_log \
+                              + " Proceed anyway?"
+        proceed_csv = messagebox.askquestion(message=missing_csv_message)
+        if proceed_csv != "yes":
+            root.quit()
+            sys.exit()
+
+
+def update():
+    empty_csv()
+    multiplier = mulitplier_selection()
+    print(multiplier, "multiplier ")
+    coll_dep_swap = cb_var.get()
+    switch = scooter_ebike.get()
+    print(switch)
     select_csv = csv_selector()
+    print(select_csv)
     cities_passed = 0
     MP_links_df = pd.read_csv(select_csv)
     number_of_cities_linked = MP_links_df.shape[0]
@@ -372,11 +518,17 @@ def update():
                     scooters_with_rides = retrieve_values(df1, CITY_NAME)
                     city_rides = retrieve_values(df2, CITY_NAME)
                     city_GMV_passes = retrieve_values(df3, CITY_NAME)
+                    print(city_GMV_passes)
                     city_GMV_passes = zeroeuro(city_GMV_passes)
                     city_GMV_without_passes = retrieve_values(df4, CITY_NAME)
                     city_GMV_without_passes = zerocomma(city_GMV_without_passes)
-                    city_GMV = replacesign(city_GMV_without_passes) + replaceEuro(city_GMV_passes)
+                    city_GMV = replacesign(city_GMV_without_passes) + (multiplier * replaceEuro(city_GMV_passes))
                     ride_duration = retrieve_values(df5, CITY_NAME)
+                    swapped_tasks = retrieve_values(df6, CITY_NAME)
+                    collected_tasks = retrieve_values(df7, CITY_NAME)
+                    deployed_tasks = retrieve_values(df8, CITY_NAME)
+                    waiting_for_parts = retrieve_values(df9, CITY_NAME)
+                    print(waiting_for_parts, CITY_NAME)
                     print(CITY_URL)
                     MP_sheet = gc.open_by_url(CITY_URL)
                     column_value = MP_column_value(MP_sheet)
@@ -389,8 +541,16 @@ def update():
                     MP_WS.update_cell(row_value[2], column_value, scooters_with_rides)
                     MP_WS.update_cell(row_value[3], column_value, city_GMV)
                     MP_WS.update_cell(row_value[4], column_value, ride_duration)
+                    MP_WS.update_cell(row_value[8], column_value, waiting_for_parts)
+                    if coll_dep_swap == 1:
+                        MP_WS.update_cell(row_value[5], column_value, collected_tasks)
+                        MP_WS.update_cell(row_value[6], column_value, deployed_tasks)
+                        MP_WS.update_cell(row_value[7], column_value, swapped_tasks)
+                    else:
+                        "do nothing"
+
                     """
-                    Row value[x] is always the th elemnt in list "crit"
+                    Row value[x] is always the th element in list "crit"
                     """
                     sleep(5)
                     cities_passed += 1
@@ -402,6 +562,8 @@ def update():
                 now_time = datetime.datetime.now()
                 now_date = now_time.strftime('%Y-%m-%d')
                 now_time = now_time.strftime('%H:%M:%S')
+                with open("coll_dep_swap_container.yaml", mode='w') as coll_dep_swap_container:
+                    yaml.dump(coll_dep_swap, coll_dep_swap_container, indent=2)
                 with open(service_account_key, 'r') as service_account_json:
                     service_account_data = json.load(service_account_json)
                     client_email = service_account_data['client_email']
@@ -411,7 +573,7 @@ def update():
                     cities_with_data = df0_rows - 1
                     Lytics_WS.insert_row([client_email, number_of_cities_linked, cities_passed, cities_with_data,
                                           dropdown_value, time_spent_on_update, now_date,
-                                          now_time, switch, App_version], 2)
+                                          now_time, switch, App_version, missing_log],  2)
                 except gspread.exceptions.APIError:
                     messagebox.showerror(message="Credentials are not valid for analytics")
                 messagebox.showinfo(message="Update successfull")
@@ -436,8 +598,9 @@ def update():
         except KeyError as keyerr:
             keyerr = "Key error  \n " "You need to Clear city list", keyerr
             messagebox.showerror(message=keyerr)
-        except ValueError:
-            messagebox.showerror(message="keys.JSON is missing, Please load credentials or contact the administrator")
+        except ValueError as Val_err:
+            Val_err = "Value error", Val_err
+            messagebox.showerror(message= Val_err)
         except google.auth.exceptions.RefreshError:
             messagebox.showerror(message="Your credentials are not valid")
 
@@ -486,6 +649,11 @@ def csv_selector():
 
 
 def store_data():
+    # TODO: check whether whitespace in city name affects the csv file
+    #  if so, explicitly throw error when there is space between city names.
+    #  Looker has dashes between city names, the same format has to be used.
+    #  Also, look for gid in the URL of masterplan.
+    #  Give suggestion in a window from the csv files how the cities should be named.
     acity_name = city_name.get()
     print(acity_name)
     acity_link = city_MP_link.get()
@@ -573,6 +741,35 @@ def second_window():
     remove_button.grid(row=1, column=0)
 
 
+def callback(url):
+    webbrowser.open_new_tab(url)
+
+
+def sop_doc():
+    callback("https://sites.google.com/bolt.eu/norwayintranet/management/master-plan-updater")
+
+
+def about_dev():
+    callback("https://github.com/adamsky777")
+
+
+def third_window():
+    history_html = 'file:///' + os.getcwd() + '/' + 'history.html'
+    callback(history_html)
+    # Does not work with tkinkter somehow
+    """
+    with open('history.html') as app_history:
+        contents = app_history.read()
+    third_win = Tk()
+
+    third_win.config(bg='#BAE2CD')
+    third_win.title("About Me")
+
+    html_label = HtmlLabel(third_win, text=contents)
+    HtmlLabel.set_zoom(html_label, 1.5)
+    html_label.pack(fill='both', expand=True)
+"""
+
 Settings_ = True
 
 root = Tk()
@@ -582,10 +779,26 @@ root.title("Project_M")
 # Menubar
 menubar = Menu(root)
 filemenu = Menu(menubar, tearoff=1)
+helpmenu = Menu(menubar, tearoff=1)
 filemenu.add_command(label="Import User Data", command=import_user_data)
 filemenu.add_command(label="Export User Data", command=save_user_data)
+filemenu.add_command(label="Import City List", command=import_city_data)
+filemenu.add_command(label="Export City List", command=save_city_data)
 filemenu.add_separator()
 menubar.add_cascade(label="File", menu=filemenu)
+
+
+helpmenu.add_command(label="About the Developer ", command=about_dev)
+helpmenu.add_command(label="SOP Documentation ", command=sop_doc)
+helpmenu.add_command(label="Update History", command=third_window)
+menubar.add_cascade(label="Help", menu=helpmenu)
+
+helpmenu.add_separator()
+
+
+
+
+
 
 root.config(bg='#BAE2CD', menu=menubar)
 
@@ -598,10 +811,11 @@ cred_key = StringVar()
 timeback = StringVar()
 scooter_ebike = StringVar()
 timeback.set("t-1")
-dropdown_options = ["t-1", "t-2", "t-3", "t-4"]
+dropdown_options = ["t-1", "t-2", "t-3", "t-4", "t-5", "t-6", "t-7"]
 boxvar = BooleanVar()
 scooter_ebike.set("Scooters")
 scooter_ebike_dropdown_options = ["Scooters", "E-bikes"]
+
 
 
 def BELOW_():
@@ -630,8 +844,7 @@ def csvGenerate_():
             messagebox.showinfo(message="E-bikes City list cleared")
 
 
-def callback(url):
-    webbrowser.open_new_tab(url)
+
 
 
 def about_dialog():
@@ -661,6 +874,8 @@ def tick():
     browse_button.grid(row=3, column=3, padx=20, pady=0)
     dropdown.grid(row=3, column=2, padx=0, pady=10)
     scooter_ebike_dropdown.grid(row=4, column=2, padx=0, pady=10)
+    cb.grid(column=3, row=4)
+
     try:
         if check_update() < 0:
             messagebox.showinfo(message="Update available \n"
@@ -684,9 +899,16 @@ Button_downloads_folder = Button(root, fg='#111111', text=str(' ' * 2 + 'Target 
 open_credentials = Button(root, fg='#111111', text=str(' ' * 2 + 'Load credentials' + ' ' * 2),
                           command=open_cred_filepath)
 row_button = Button(root, fg='#111111', text=str(' ' * 2 + 'row test' + ' ' * 2), command=MP_row_value)
-browse_button = Button(root, fg='#111111', text=str(' ' * 2 + 'Browse city list' + ' ' * 2), command=second_window)
+browse_button = Button(root, fg='#111111', text=str(' ' * 2 + 'View city list' + ' ' * 2), command=second_window)
 dropdown = OptionMenu(root, timeback, *dropdown_options)
 scooter_ebike_dropdown = OptionMenu(root, scooter_ebike, *scooter_ebike_dropdown_options)
+cb_var = IntVar()
+if cb_var_yaml == 0:
+    cb_var.set(0)
+else:
+    cb_var.set(1)
+cb = Checkbutton(root, text="Coll.Dep.Swap", variable=cb_var, onvalue=1, offvalue=0)
+
 
 tick()
 root.mainloop()
