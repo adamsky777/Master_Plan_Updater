@@ -527,6 +527,8 @@ def update():
                     swapped_tasks = retrieve_values(df6, CITY_NAME)
                     collected_tasks = retrieve_values(df7, CITY_NAME)
                     deployed_tasks = retrieve_values(df8, CITY_NAME)
+                    #Todo: waiting for parts e-bikes multiplier zero. All waiting for parts should be allocated to
+                    # scooters.
                     waiting_for_parts = retrieve_values(df9, CITY_NAME)
                     print(waiting_for_parts, CITY_NAME)
                     print(CITY_URL)
