@@ -7,11 +7,75 @@
 <basefont color="black">
 <body>
 
-<p> Hello, I came to this world to save time and take care of the dull stuff while you enjoy a cup of coffee, relax, or do something amazing.</p>
+<p>Made with Love in Oslo, Norway.</p>
 <p><i>“Why Join the navy if you can be a pirate?”</i></p>
 <p><i>“Real artists ship.”</i></p>
 <p><i>“Stay hungry, stay foolish.”</i></p>
-<p><strong>Read my development history.</strong></p>
+<p><i>“United we stand, divided we fall.”</i></p>
+<p><i>“After love, the sense of productivity is the most fulfilling emotion.”</i></p>
+<p><i>“Remember that not getting what you want is sometimes a wonderful stroke of luck.”</i></p>
+<p><i>“Your mind is your prison when you focus on your fear.”</i></p>
+<p><i>“I skate to where the puck is going to be, not where it has been.”</i></p>
+<p><i>“As is a tale, so is life: not how long it is, but how good it is, is what matters.”</i></p>
+<p><i>“The trials you encounter will introduce you to your strengths.”</i></p>
+
+
+
+<p><strong>Development history.</strong></p>
+
+<p><strong>v2.1.6</strong></p>
+<ul>
+    <li> Issue fixed relating to launching issues, caused by inappropriate loading of csv.</li>
+
+</ul>
+
+
+
+<p><strong>v2.1.5</strong></p>
+<ul>
+    <li> 2023 MP ready.</li>
+    <li> Custom message, and instant feedbacks.</li>
+    <li> Tasks split by FOA & 3PL </li>
+
+
+</ul>
+
+<p><strong>v2.1.4</strong></p>
+<ul>
+<li> Duplicate types bug:</li>
+    <li> Zip and folder types can’t be removed simultaneously with shutil.rmtree.
+Could happen when a user had Daily_numbers_for_masterplan
+        (Directory) and also  Daily_numbers_for_masterplan.zip as a zip file placed accidentally in the user downloads folder.
+    <li>Caused the program to throw Err:NotADirectory and collapse.</li>
+    <li>
+    Implementation:
+        Send2Trash:
+        Now all files (dashboard-daily_numbers_for_masterplan are sent to trash regardless of their suffix.
+
+</li>
+</li>
+</ul>
+
+<p><strong>Waiting for Parts zero ebike:</strong></p>
+
+<li>All waiting for parts values allocated to scooters.</li>
+<li>Double recording issue resolved.</li>
+
+
+
+<p><strong>Issue with Bydgoszcz Poland :</strong></p>
+<p>Updated failed because the masterplan was not valid - Rows and Column names should not be modified.</p>
+
+<li> Throws an error when one or more metric from column C is missing (Accidentally removed by local ops)</li>
+
+
+</ul>
+
+
+
+
+
+
 <p><strong>v2.1.3</strong></p>
 <ul>
 <li>New feature, waiting for parts</li>

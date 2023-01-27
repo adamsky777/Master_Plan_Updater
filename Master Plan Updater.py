@@ -8,6 +8,7 @@ from tkinter import messagebox
 from time import sleep
 import google.auth.exceptions
 import gspread.exceptions
+import numpy as np
 import pandas as pd
 import gspread as gs
 import shutil
@@ -23,6 +24,9 @@ import sys
 import pyminizip
 import os
 import semver
+import send2trash
+import copy
+import ssl
 #from tkhtmlview import HTMLLabel
 from tkinterweb import HtmlLabel
 
@@ -31,9 +35,41 @@ from tkinterhtml import HtmlFrame
 #Ignore SIG_PIPE and don't throw exceptions on it... (http://docs.python.org/library/signal.html)
 #signal(SIGPIPE, SIG_DFL)
 
-App_version = "2.1.3"
-App_code = "BPFWPA1207A"
+App_version = "2.1.6"
+App_code = "NLIMD270123"
 
+# LOAD Default message
+# Todo: Hanlde URLErrol when user not connected to the internet.
+ssl._create_default_https_context = ssl._create_unverified_context
+default_message = pd.read_html("https://docs.google.com/spreadsheets/d/e/2PACX-1vSkU65RepNSeh2li9jHweV9G-0E4NXYsokzoTAwZ3VbeS2x2abtGgxQkP7Nx6hD-qQffhcb-SDi4nPB/pubhtml?gid=0&single=true", skiprows=1)
+default_message = default_message[0]
+del default_message[default_message.columns[0]]
+default_message = (default_message.columns.tolist())[0]
+
+
+empty_df = {
+    'Unnamed: 0': [],
+    'Dynamic Timeframe': [],
+    '3PL': []
+}
+empty_df_3PL = {
+    'Unnamed: 0':[],
+    'Dynamic Timeframe':[],
+    '3PL': []
+               }
+
+empty_df_Total = {
+    'Unnamed: 0': [],
+    'Dynamic Timeframe': [],
+    'Total': []
+}
+
+#empty_df_3PL = pd.DataFrame(empty_df_3PL)
+#print(empty_df_3PL)
+missing_log = []
+
+# Print text green
+def prGreen(skk): print("\033[92m {}\033[00m" .format(skk))
 
 def find_folders(path_to_dir, suffix=""):
     """
@@ -46,11 +82,6 @@ def find_folders(path_to_dir, suffix=""):
     filenames = os.listdir(download_directory)
     return [filename for filename in filenames if filename.endswith(suffix)]
 
-empty_df = {
-        'Dynamic Timeframe':[],
-               'Time': []
-               }
-missing_log = []
 
 directory = '~/Downloads/'
 all_folders_list = find_folders(directory)
@@ -66,7 +97,8 @@ if len(folder_list) > 1:
     duplicates_question = messagebox.askquestion(message="Do you want to remove the duplicates?")
     if duplicates_question == "yes":
         for i in folder_list:
-            shutil.rmtree(os.path.expanduser("~")+"/Downloads/"+i)
+            send2trash.send2trash(os.path.expanduser("~")+"/Downloads/"+i)
+            print(i)
 
         sys.exit()
     else:
@@ -79,14 +111,20 @@ elif len(folder_list) == 0:
     sys.exit()
 
 else:
-
     try:
+        # Avg daily active vehicles on the street df0
         df0 = pd.read_csv(
             "~/Downloads/dashboard-daily_numbers_for_masterplan/average_daily_active_vehicles_on_the_street.csv")
         #   gets the value of average number of scooter deployed
         df0 = df0.fillna(float(0))
         shape_df0 = df0.shape  # shape of df3 ( instance : tuple)
         df0_rows = int(shape_df0[0])
+        df0_columns = int(shape_df0[1])
+        if df0_columns > 3:
+            messagebox.showerror(message="Your Looker schedule is incorrect. Too many days in the data. "
+                                         "Set it to: 'is in the last 1 complete day'.")
+            sys.exit()
+
         # df_check = 1/int(df0_rows)
     except FileNotFoundError:
         messagebox.showerror(message="the daily numbers for masterplan is not exsist in the downloads folder")
@@ -96,6 +134,7 @@ else:
     # sys.exit()
 
     try:
+        # Avg daily vehicles with 1+ trip df1
         df1 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/average_daily_vehicles_with_1+_trips.csv")
         # gets the value of scooters with rides in respect of the corresponding city
         df1 = df1.fillna(float(0))
@@ -105,15 +144,15 @@ else:
         missing_log.append("average_daily_vehicles_with_1+_trips.csv")
 
     try:
+        # Rides df2
         df2 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/rides.csv")
         df2 = df2.fillna(float(0))
         shape_df2 = df2.shape
     except FileNotFoundError:
         df2 = pd.DataFrame(empty_df)
         missing_log.append("rides.csv")
-
     try:
-        # GMV from PASSES
+        # GMV from PASSES df3
         df3 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/gmv_from_passes.csv")
         # changes NaN values to €0.0
         df3 = df3.fillna("€0.0")
@@ -124,7 +163,7 @@ else:
         missing_log.append("gmv_from_passes.csv")
 
     try:
-        # GMV without passes
+        # GMV without passes df4
         df4 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/gmv_(without_passes).csv")
         df4 = df4.fillna("0")
         shape_df4 = df4.shape
@@ -141,30 +180,44 @@ else:
         missing_log.append("average_order_duration_minutes.csv")
 
     try:
-        # battery swaps df6
-        df6 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/battery_swaps_by_3pl.csv")
+        # battery swaps 3PL df6
+        df6 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/battery_swaps_by_3pl.csv", skiprows=[1],
+                          thousands=',')
         df6 = df6.fillna("0")
+        if df6.shape[0] == 0:
+            df6 = pd.DataFrame(empty_df_3PL)
+        else:
+            df6 = df6.rename(columns={df6.columns[2]: '3PL'})
     except FileNotFoundError:
-        df6 = pd.DataFrame(empty_df)
+        df6 = pd.DataFrame(empty_df_3PL)
         missing_log.append("battery_swaps_by_3pl.csv")
 
     try:
-        # collected df7
-        df7 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/collected_by_3pl.csv")
+        # collected 3PL df7
+        df7 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/collected_by_3pl.csv", skiprows=[1])
         df7 = df7.fillna("0")
+        if df7.shape[0] == 0:
+            df7 = pd.DataFrame(empty_df_3PL)
+        else:
+            df7 = df7.rename(columns={df7.columns[2]: '3PL'})
     except FileNotFoundError:
-        df7 = pd.DataFrame(empty_df)
+        df7 = pd.DataFrame(empty_df_3PL)
         missing_log.append("collected_by_3pl.csv")
 
     try:
-        # deployed df8
-        df8 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/deployed_by_3pl.csv")
+        # deployed 3PL df8
+        df8 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/deployed_by_3pl.csv", skiprows=[1])
         df8 = df8.fillna("0")
+        if df8.shape[0] == 0:
+            df8 = pd.DataFrame(empty_df_3PL)
+        else:
+            df8 = df8.rename(columns={df8.columns[2]: '3PL'})
     except FileNotFoundError:
-        df8 = pd.DataFrame(empty_df)
+        df8 = pd.DataFrame(empty_df_3PL)
         missing_log.append("deployed_by_3pl.csv")
 
     try:
+
         # Waiting for parts
         """Note that csv of WP has different style, so inserting a row to the left achieves the same look 
             -> we can use the same iteration """
@@ -174,6 +227,115 @@ else:
     except FileNotFoundError:
         df9 = pd.DataFrame(empty_df)
         missing_log.append("vehicles_waiting_for_parts.csv")
+
+    try:
+        # sum collected df10
+        df10 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/collected.csv", skiprows=[1])
+        df10 = df10.fillna("0")
+        if df10.shape[0] == 0:
+            df10 = pd.DataFrame(empty_df_Total)
+        else:
+            df10 = df10.rename(columns={df10.columns[2]: 'Total'})
+    except FileNotFoundError:
+        df10 = pd.DataFrame(empty_df_Total)
+        missing_log.append("collected.csv")
+
+    try:
+        # sum deployed df11
+        df11 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/deployed.csv", skiprows=[1])
+        df11 = df11.fillna("0")
+        if df11.shape[0] == 0:
+            df11 = pd.DataFrame(empty_df_Total)
+        else:
+            df11 = df11.rename(columns={df11.columns[2]: 'Total'})
+    except FileNotFoundError:
+        df11 = pd.DataFrame(empty_df_Total)
+        missing_log.append("deployed.csv")
+    try:
+        # sum battery_swaps df12
+        df12 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/battery_swaps.csv", skiprows=[1],
+                           thousands=',')
+        df12 = df12.fillna("0")
+        if df12.shape[0] == 0:
+            df12 = pd.DataFrame(empty_df_Total)
+        else:
+            df12 = df12.rename(columns={df12.columns[2]: 'Total'})
+    except FileNotFoundError:
+        df12 = pd.DataFrame(empty_df_Total)
+        missing_log.append("battery_swaps.csv")
+
+# __________________________________________ In-house FOA calculations ________________________________________________
+
+print(df7.columns)
+
+collected_merge_df = pd.merge(df10, df7,
+                   on='Dynamic Timeframe',
+                   how='outer')
+
+print(collected_merge_df.columns)
+collected_merge_df["3PL"] = collected_merge_df["3PL"].fillna(0)
+collected_merge_df["FOA"] = collected_merge_df['Total'] - collected_merge_df["3PL"]
+collected_merge_df["FOA"] = collected_merge_df["FOA"].fillna(0)
+
+# Use deepcopy function provided in the default package 'copy'
+df10 = copy.deepcopy(collected_merge_df[["Dynamic Timeframe", "FOA"]])
+df10['FOA'] = df10['FOA'].mask(df10['FOA'] < 0, 0) # mask negative values.
+df10.loc[-1] = ['City Country Region', 'Count Operations']
+df10 = df10.sort_index().reset_index(drop=True)
+df10.insert(0, 'Unnamed: 0', np.nan)
+
+
+deployed_merge_df = pd.merge(df11, df8,
+                   on='Dynamic Timeframe',
+                   how='outer')
+deployed_merge_df["3PL"] = deployed_merge_df["3PL"].fillna(0)
+deployed_merge_df["FOA"] = deployed_merge_df['Total'] - deployed_merge_df["3PL"]
+deployed_merge_df["FOA"] = deployed_merge_df["FOA"].fillna(0)
+
+df11 = copy.deepcopy(deployed_merge_df[["Dynamic Timeframe", "FOA"]])
+df11['FOA'] = df11['FOA'].mask(df11['FOA'] < 0, 0) # mask negative values.
+df11.loc[-1] = ['City Country Region', 'Count Operations']
+df11 = df11.sort_index().reset_index(drop=True)
+df11.insert(0, 'Unnamed: 0', np.nan)
+
+
+
+swaps_merge_df = pd.merge(df12, df6,
+                   on='Dynamic Timeframe',
+                   how='outer')
+
+swaps_merge_df['Total'] = swaps_merge_df['Total'].astype(int)
+swaps_merge_df["3PL"] = swaps_merge_df["3PL"].astype(int)
+swaps_merge_df["3PL"] = swaps_merge_df["3PL"].fillna(0)
+swaps_merge_df["FOA"] = swaps_merge_df['Total'] - swaps_merge_df["3PL"]
+swaps_merge_df["FOA"] = swaps_merge_df["FOA"].fillna(0)
+
+
+
+df12 = copy.deepcopy(swaps_merge_df[["Dynamic Timeframe", "FOA"]])
+df12['FOA'] = df12['FOA'].mask(df12['FOA'] < 0, 0) # msk negative values.
+df12.loc[-1] = ['City Country Region', 'Count Operations']
+df12 = df12.sort_index().reset_index(drop=True)
+df12.insert(0, 'Unnamed: 0', np.nan)
+
+
+
+print(df12.columns, df6.columns)
+
+for i in [df12, df11, df10, df6, df7, df8]:
+    print(i.shape)
+
+def revert_df_layout(df):
+    old_entry = ['777', 'City Country Region', 'Count Operations']
+    df.loc[((len(df) - 1.5) - len(df))] = old_entry
+    df = df.sort_index().reset_index(drop=True)
+    return df
+
+for i in [df12, df11, df10, df6, df7, df8]:
+    revert_df_layout(i)
+
+
+# __________________________________________ END In-house FOA calculations _____________________________________________
 
 missing_log = [i +", " for i in missing_log]
 missing_log ="".join(str(i) for i in missing_log)
@@ -359,9 +521,10 @@ def MP_row_value(MP_Sheet):
     MP_column_A_data = MP_Sheet.values_batch_get('Daily!C:C').get('valueRanges')
     MP_column_A_list = MP_column_A_data[0]
     MP_column_A_list = MP_column_A_list.get('values')
-    crit = ['Active supply (on street)'], ['Rides'], ['Ridden vehicles'], ['Revenue'], ['Ride Duration (minutes)'], [
+    crit = ['Active supply (on street)'], ['Rides'], ['Ridden vehicles'], ['Revenue (inc. VAT)'], ['Ride Duration (minutes)'], [
         '3PL # collected tasks fulfilled'], ['3PL # deployed tasks fulfilled'], ['3PL # swapped tasks fulfilled'], \
-           ["Waiting for parts"]
+           ["Waiting for parts"], ['FOA # collected tasks fulfilled'], ['FOA # deployed tasks fulfilled'], \
+           ['FOA # swapped tasks fulfilled']
     row_list = [i for i in crit if i in MP_column_A_list]
     row_indexes = [MP_column_A_list.index(x) for x in row_list]
     row_indexes = [x + 1 for x in row_indexes]
@@ -379,7 +542,7 @@ def MP_column_value(MP_Sheet):
     else:
         print("Item not found in Dataset")
         column_index = "nan"
-        messagebox.showerror("Dates are not found in 2:2 row")
+        messagebox.showerror(message="Dates are not found in 2:2 row / incorrect date formatting")
     return column_index
 
 
@@ -487,6 +650,13 @@ def empty_csv():
 
 
 def update():
+    label_indicator.config(text="", bg="#BAE2CD")
+    label_indicator.config(text="Please Wait", bg="#BAE2CD")
+    print(check_version_approve())
+    if check_version_approve() < 1:
+        messagebox.showinfo(message="DErrNO5 e8641d72759eecd7d9461c8443ed2fcd, contact the developer M.")
+        root.quit()
+        sys.exit()
     empty_csv()
     multiplier = mulitplier_selection()
     print(multiplier, "multiplier ")
@@ -500,6 +670,9 @@ def update():
     number_of_cities_linked = MP_links_df.shape[0]
     all_cities_list = MP_links_df['CityName'].values.tolist()
     print(all_cities_list)
+    label_indicator.config(text="", bg="#BAE2CD")
+    label_indicator.config(text="Connection OK", bg="#BAE2CD")
+    sleep(0.5)
     if all_cities_list == []:
         messagebox.showerror(message="Nothing to update, City list is empty")
     else:
@@ -509,6 +682,7 @@ def update():
                 gc = gs.service_account(service_account_key)
                 t2 = threading.Thread(target=p_bar)
                 start_timer = time.process_time()
+                label_indicator.config(text="", bg="#BAE2CD")
                 while cities_passed < number_of_cities_linked:
                     # print(MP_links_df.iloc[0, 0])
                     CITY_NAME = MP_links_df['CityName'].values[cities_passed]
@@ -524,38 +698,54 @@ def update():
                     city_GMV_without_passes = zerocomma(city_GMV_without_passes)
                     city_GMV = replacesign(city_GMV_without_passes) + (multiplier * replaceEuro(city_GMV_passes))
                     ride_duration = retrieve_values(df5, CITY_NAME)
-                    swapped_tasks = retrieve_values(df6, CITY_NAME)
-                    collected_tasks = retrieve_values(df7, CITY_NAME)
-                    deployed_tasks = retrieve_values(df8, CITY_NAME)
-                    #Todo: waiting for parts e-bikes multiplier zero. All waiting for parts should be allocated to
-                    # scooters.
-                    waiting_for_parts = retrieve_values(df9, CITY_NAME)
-                    print(waiting_for_parts, CITY_NAME)
-                    print(CITY_URL)
+                    swapped_tasks_3PL = retrieve_values(df6, CITY_NAME)
+                    collected_tasks_3PL = retrieve_values(df7, CITY_NAME)
+                    deployed_tasks_3PL = retrieve_values(df8, CITY_NAME)
+                    waiting_for_parts = (retrieve_values(df9, CITY_NAME))
+                    collected_tasks_FOA = retrieve_values(df10, CITY_NAME)
+                    deployed_tasks_FOA = retrieve_values(df11, CITY_NAME)
+                    swapped_tasks_FOA = retrieve_values(df12, CITY_NAME)
+                    if multiplier == 0:
+                        waiting_for_parts = 0
+                    else:
+                        waiting_for_parts = waiting_for_parts
+                    print(waiting_for_parts)
+                    print(CITY_NAME, CITY_URL)
+                    label_indicator.config(text= "", bg="#BAE2CD")
+                    label_indicator.config(text= "In progress: " + CITY_NAME , bg="#BAE2CD")
                     MP_sheet = gc.open_by_url(CITY_URL)
                     column_value = MP_column_value(MP_sheet)
                     row_value = MP_row_value(MP_sheet)
                     MP_WS = MP_sheet.worksheet('Daily')
-                    MP_WS.update_cell(row_value[0], column_value, scooters_deployed)
-                    if cities_passed < 1:
-                        t2.start()
-                    MP_WS.update_cell(row_value[1], column_value, city_rides)
-                    MP_WS.update_cell(row_value[2], column_value, scooters_with_rides)
-                    MP_WS.update_cell(row_value[3], column_value, city_GMV)
-                    MP_WS.update_cell(row_value[4], column_value, ride_duration)
-                    MP_WS.update_cell(row_value[8], column_value, waiting_for_parts)
-                    if coll_dep_swap == 1:
-                        MP_WS.update_cell(row_value[5], column_value, collected_tasks)
-                        MP_WS.update_cell(row_value[6], column_value, deployed_tasks)
-                        MP_WS.update_cell(row_value[7], column_value, swapped_tasks)
-                    else:
-                        "do nothing"
+                    try:
+                        MP_WS.update_cell(row_value[0], column_value, scooters_deployed)
+                        if cities_passed < 1:
+                            t2.start()
+                        MP_WS.update_cell(row_value[1], column_value, city_rides)
+                        MP_WS.update_cell(row_value[2], column_value, scooters_with_rides)
+                        MP_WS.update_cell(row_value[3], column_value, city_GMV)
+                        MP_WS.update_cell(row_value[4], column_value, ride_duration)
+                        MP_WS.update_cell(row_value[8], column_value, waiting_for_parts)
+                        if coll_dep_swap == 1:
+                            MP_WS.update_cell(row_value[5], column_value, collected_tasks_3PL)
+                            MP_WS.update_cell(row_value[6], column_value, deployed_tasks_3PL)
+                            MP_WS.update_cell(row_value[7], column_value, swapped_tasks_3PL)
+                            MP_WS.update_cell(row_value[9], column_value, collected_tasks_FOA)
+                            MP_WS.update_cell(row_value[10], column_value, deployed_tasks_FOA)
+                            MP_WS.update_cell(row_value[11], column_value, swapped_tasks_FOA)
+                        else:
+                            "do nothing"
 
-                    """
-                    Row value[x] is always the th element in list "crit"
-                    """
-                    sleep(5)
-                    cities_passed += 1
+                        """
+                        Row value[x] is always the th element in list "crit"
+                        """
+                        sleep(5)
+                        cities_passed += 1
+                    except IndexError as i_err:
+                        index_error_message= "One or more metrics are missing from the Masterplan Column C, Ask the developer for instructions. "+ str(i_err)
+                        messagebox.showerror(message=index_error_message)
+                        root.quit()
+                        sys.exit()
                 downloads_folder_path = read_downloads_folder_path()
                 shutil.rmtree(downloads_folder_path)
                 end_timer = time.process_time()
@@ -564,6 +754,7 @@ def update():
                 now_time = datetime.datetime.now()
                 now_date = now_time.strftime('%Y-%m-%d')
                 now_time = now_time.strftime('%H:%M:%S')
+                UID = re.sub("[/].*[/]", "", os.path.expanduser('~'))
                 with open("coll_dep_swap_container.yaml", mode='w') as coll_dep_swap_container:
                     yaml.dump(coll_dep_swap, coll_dep_swap_container, indent=2)
                 with open(service_account_key, 'r') as service_account_json:
@@ -575,9 +766,11 @@ def update():
                     cities_with_data = df0_rows - 1
                     Lytics_WS.insert_row([client_email, number_of_cities_linked, cities_passed, cities_with_data,
                                           dropdown_value, time_spent_on_update, now_date,
-                                          now_time, switch, App_version, missing_log],  2)
+                                          now_time, switch, App_version, missing_log, UID],  2)
                 except gspread.exceptions.APIError:
                     messagebox.showerror(message="Credentials are not valid for analytics")
+                label_indicator.config(text="", bg="#BAE2CD")
+                label_indicator.config(text="Done!", bg="#BAE2CD")
                 messagebox.showinfo(message="Update successfull")
                 sleep(0.7)
                 root.quit()
@@ -585,12 +778,14 @@ def update():
             else:
                 print("err found")
 
-        except gspread.exceptions.NoValidUrlKeyFound:
+        except gspread.exceptions.NoValidUrlKeyFound as nw_url_key:
             messagebox.showerror(message="URL error  \n "
                                          "You need to Clear city list, and Add valid URLs")
-        except gspread.exceptions.APIError:
+            print(nw_url_key)
+        except gspread.exceptions.APIError as API_err:
             messagebox.showerror(message="Permission denied,\n "
                                          "your credentials does not have the right accesses. Contact the administrator")
+            print(API_err)
             # Added a new line here to exit when the user does not have the right permission
             # TODO: (NEEDS TO BE TESTED)
             sys.exit()
@@ -605,6 +800,35 @@ def update():
             messagebox.showerror(message= Val_err)
         except google.auth.exceptions.RefreshError:
             messagebox.showerror(message="Your credentials are not valid")
+
+
+def check_version_approve():
+    try:
+        with open("credentials_path_container.yaml", mode='r') as cred_path_container:
+            cred_path = yaml.load(cred_path_container, Loader=yaml.FullLoader)
+            if cred_path != "":
+                service_account_key = read_cread_filepath()
+                gc = gs.service_account(service_account_key)
+                lytics_sheet = gc.open_by_key('1rOh6imkp-nLbnER4n-U7wQnEUhaaVmBZpilceUq56Zk')
+                WS_Update = lytics_sheet.worksheet('UPDATE')
+                Approved_v = ((WS_Update.get_values("B2")[0])[0])
+
+                return semver.compare(App_version, Approved_v)
+
+            else:
+                "Do nothing"
+
+    except ValueError as vr:
+        print(vr)
+    except gspread.exceptions.APIError as api_err:
+        print(api_err)
+    except yaml.parser.ParserError as yml_err:
+        print(yml_err)
+        label_indicator.config(text="Connection Failed.", bg="#BAE2CD")
+        messagebox.showerror(message="To Proceed please load credentials")
+    except gspread.exceptions.NoValidUrlKeyFound as NoValidUrlKeyFound:
+        messagebox.showerror(message=NoValidUrlKeyFound)
+
 
 
 def check_update():
@@ -752,7 +976,7 @@ def sop_doc():
 
 
 def about_dev():
-    callback("https://github.com/adamsky777")
+    callback("https://no.linkedin.com/in/adam-torkos-4055a4a8")
 
 
 def third_window():
@@ -854,7 +1078,7 @@ def about_dialog():
 
 
 def tick():
-    Txt = Label(text="Master Plan Updater", font=("helvetica", 25, "bold",), bg=("#BAE2CD"))
+    Txt = Label(text="MasterPlan Updater", font=("helvetica", 25, "bold",), bg=("#BAE2CD"))
     dev = Label(text="@Adam Torkos", font=("helvetica", 12), bg=("#BAE2CD"), cursor="hand2")
     dev.bind("<Button-1>",
              lambda e: callback("mailto:adam.torkos@bolt.eu?cc=adam.torkos@me.com&subject=Master%20Plan%20Updater"))
@@ -877,6 +1101,8 @@ def tick():
     dropdown.grid(row=3, column=2, padx=0, pady=10)
     scooter_ebike_dropdown.grid(row=4, column=2, padx=0, pady=10)
     cb.grid(column=3, row=4)
+    label_indicator.config(text=default_message, bg="#BAE2CD")
+    label_indicator.grid(column=2, row=1)
 
     try:
         if check_update() < 0:
@@ -910,7 +1136,8 @@ if cb_var_yaml == 0:
 else:
     cb_var.set(1)
 cb = Checkbutton(root, text="Coll.Dep.Swap", variable=cb_var, onvalue=1, offvalue=0)
-
+label_indicator = tkinter.Label(root)
+label_indicator.grid(row=1, column=2)
 
 tick()
 root.mainloop()
