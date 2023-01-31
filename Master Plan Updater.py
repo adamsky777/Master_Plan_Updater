@@ -272,8 +272,9 @@ collected_merge_df = pd.merge(df10, df7,
                    on='Dynamic Timeframe',
                    how='outer')
 
-print(collected_merge_df.columns)
-collected_merge_df["3PL"] = collected_merge_df["3PL"].fillna(0)
+#prGreen(collected_merge_df.columns)
+collected_merge_df['Total'] = collected_merge_df['Total'].fillna(0).astype(int)
+collected_merge_df["3PL"] = collected_merge_df["3PL"].fillna(0).astype(int)
 collected_merge_df["FOA"] = collected_merge_df['Total'] - collected_merge_df["3PL"]
 collected_merge_df["FOA"] = collected_merge_df["FOA"].fillna(0)
 
@@ -288,7 +289,9 @@ df10.insert(0, 'Unnamed: 0', np.nan)
 deployed_merge_df = pd.merge(df11, df8,
                    on='Dynamic Timeframe',
                    how='outer')
-deployed_merge_df["3PL"] = deployed_merge_df["3PL"].fillna(0)
+
+deployed_merge_df['Total'] = deployed_merge_df['Total'].fillna(0).astype(int)
+deployed_merge_df["3PL"] = deployed_merge_df["3PL"].fillna(0).astype(int)
 deployed_merge_df["FOA"] = deployed_merge_df['Total'] - deployed_merge_df["3PL"]
 deployed_merge_df["FOA"] = deployed_merge_df["FOA"].fillna(0)
 
@@ -304,11 +307,10 @@ swaps_merge_df = pd.merge(df12, df6,
                    on='Dynamic Timeframe',
                    how='outer')
 
-swaps_merge_df['Total'] = swaps_merge_df['Total'].astype(int)
-swaps_merge_df["3PL"] = swaps_merge_df["3PL"].astype(int)
-swaps_merge_df["3PL"] = swaps_merge_df["3PL"].fillna(0)
+swaps_merge_df['Total'] = swaps_merge_df['Total'].fillna(0).astype(int)
+swaps_merge_df["3PL"] = swaps_merge_df["3PL"].fillna(0).astype(int)
 swaps_merge_df["FOA"] = swaps_merge_df['Total'] - swaps_merge_df["3PL"]
-swaps_merge_df["FOA"] = swaps_merge_df["FOA"].fillna(0)
+swaps_merge_df["FOA"] = swaps_merge_df["FOA"].fillna(0).astype(int)
 
 
 
