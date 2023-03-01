@@ -1,6 +1,7 @@
 import json
 import time
 import tkinter.ttk
+import urllib.error
 import zipfile
 from tkinter import *
 import csv
@@ -35,16 +36,20 @@ from tkinterhtml import HtmlFrame
 #Ignore SIG_PIPE and don't throw exceptions on it... (http://docs.python.org/library/signal.html)
 #signal(SIGPIPE, SIG_DFL)
 
-App_version = "2.1.6"
-App_code = "NLIMD270123"
+App_version = "2.1.7"
+App_code = "NMF230220"
 
 # LOAD Default message
-# Todo: Hanlde URLErrol when user not connected to the internet.
 ssl._create_default_https_context = ssl._create_unverified_context
-default_message = pd.read_html("https://docs.google.com/spreadsheets/d/e/2PACX-1vSkU65RepNSeh2li9jHweV9G-0E4NXYsokzoTAwZ3VbeS2x2abtGgxQkP7Nx6hD-qQffhcb-SDi4nPB/pubhtml?gid=0&single=true", skiprows=1)
-default_message = default_message[0]
-del default_message[default_message.columns[0]]
-default_message = (default_message.columns.tolist())[0]
+try:
+    default_message = pd.read_html("https://docs.google.com/spreadsheets/d/e/2PACX-1vSkU65RepNSeh2li9jHweV9G-0E4NXYsokzoTAwZ3VbeS2x2abtGgxQkP7Nx6hD-qQffhcb-SDi4nPB/pubhtml?gid=0&single=true", skiprows=1)
+    default_message = default_message[0]
+    del default_message[default_message.columns[0]]
+    default_message = (default_message.columns.tolist())[0]
+except urllib.error.URLError as URL_err:
+    messagebox.showerror(message=str(URL_err) + " You might not connected to the internet.")
+    sys.exit()
+
 
 
 empty_df = {
@@ -110,6 +115,8 @@ elif len(folder_list) == 0:
     messagebox.showerror(message="Folder: 'dashboard-daily_numbers_for_masterplan' is missing from your downloads folder")
     sys.exit()
 
+# Todo: Handle when cities paused, but revenue coming from passes. -> Looker generates csv with 3 columns instead of 2.
+
 else:
     try:
         # Avg daily active vehicles on the street df0
@@ -120,7 +127,9 @@ else:
         shape_df0 = df0.shape  # shape of df3 ( instance : tuple)
         df0_rows = int(shape_df0[0])
         df0_columns = int(shape_df0[1])
-        if df0_columns > 3:
+        # Drops a message to the user only when incorrect schedule loaded in. Ignores when values missing.
+        prGreen(df0_columns)
+        if df0_columns > 3 and df0_rows > 0:
             messagebox.showerror(message="Your Looker schedule is incorrect. Too many days in the data. "
                                          "Set it to: 'is in the last 1 complete day'.")
             sys.exit()
@@ -264,6 +273,14 @@ else:
         df12 = pd.DataFrame(empty_df_Total)
         missing_log.append("battery_swaps.csv")
 
+    # vehciles waiting for service.
+    try:
+        df14 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/vehicles_waiting_for_service.csv")
+        df14 = df14.fillna(0)
+    except FileNotFoundError:
+        df14 = pd.DataFrame(empty_df)
+        missing_log.append("vehicles_waiting_for_service.csv")
+
 # __________________________________________ In-house FOA calculations ________________________________________________
 
 print(df7.columns)
@@ -350,6 +367,11 @@ locker = "19StayHungryStayFoolish84"
 with open("coll_dep_swap_container.yaml", mode='r') as coll_dep_swap_container:
     cb_var_yaml = yaml.load(coll_dep_swap_container, Loader=yaml.FullLoader)
 
+with open("coll_dep_swap_container.json", mode='r')as coll_dep_swap_container:
+    cb_var_json = json.load(coll_dep_swap_container)
+    cb_var_3PL = cb_var_json["3PL"]
+    cb_var_in_house = cb_var_json["In-house"]
+
 
 def save_user_data():
     """
@@ -366,8 +388,9 @@ def save_user_data():
                                                   'downloads_path_container.yaml'),
                                      os.path.join(os.getcwd(), 'credentials_path_container.yaml'),
                                      os.path.join(os.getcwd(), 'E-Bikes_Master_Plan_links.csv'),
-                                     os.path.join(os.getcwd(), 'Master_Plan_links.csv')],
-                                    [u'/', u'/', u'/', u'/'], save_path, locker, 0)
+                                     os.path.join(os.getcwd(), 'Master_Plan_links.csv'),
+                                    os.path.join(os.getcwd(), 'user_ID.yaml')],
+                                    [u'/', u'/', u'/', u'/', u'/'], save_path, locker, 0)
         messagebox.showinfo(message="User data saved")
     else:
         messagebox.showinfo(message=" User data not saved")
@@ -382,9 +405,22 @@ def import_user_data():
     import_path = filedialog.askopenfilename(filetypes=[('Zip File', '*.zip')])
     if import_path != "":
         with zipfile.ZipFile(import_path, 'r') as user_data_zip:
-            user_data_zip.extractall(pwd=locker.encode())
-        messagebox.showinfo(message="User Data successfully loaded")
-        os.remove(import_path)
+            user_data_zip.extractall(pwd=locker.encode(), path="Temp/")
+            temp_folder_items = os.listdir("Temp")
+            prGreen(check_user())
+            if check_user() == "OK":
+                user_data_zip.extractall(pwd=locker.encode())
+                messagebox.showinfo(message="User Data successfully loaded")
+                for i in temp_folder_items:
+                    send2trash.send2trash(os.path.join("Temp", i))
+
+            elif check_user() == "not valid":
+                prGreen(temp_folder_items)
+                for i in temp_folder_items:
+                    send2trash.send2trash(os.path.join("Temp", i))
+                messagebox.showerror(message="User Data is NOT interchangeable. Use city list instead.")
+
+        send2trash.send2trash(import_path)
     else:
         messagebox.showinfo(message=" User data not loaded")
 
@@ -526,7 +562,16 @@ def MP_row_value(MP_Sheet):
     crit = ['Active supply (on street)'], ['Rides'], ['Ridden vehicles'], ['Revenue (inc. VAT)'], ['Ride Duration (minutes)'], [
         '3PL # collected tasks fulfilled'], ['3PL # deployed tasks fulfilled'], ['3PL # swapped tasks fulfilled'], \
            ["Waiting for parts"], ['FOA # collected tasks fulfilled'], ['FOA # deployed tasks fulfilled'], \
-           ['FOA # swapped tasks fulfilled']
+           ['FOA # swapped tasks fulfilled'], ['Backlog']
+    if 'Backlog daily change' in MP_column_A_list:
+        MP_column_A_list.replace('Backlog daily change', 'Daily Change Backlog')
+        """
+        NB:
+        Before we iterate over the list, replaces Backlog Daily ∆ with Daily Change Backlog.
+        The reason: We want to return the index below, related to "Backlog" instead having the posibility to falsely 
+        returning "Backlog daily Change".
+        """
+
     row_list = [i for i in crit if i in MP_column_A_list]
     row_indexes = [MP_column_A_list.index(x) for x in row_list]
     row_indexes = [x + 1 for x in row_indexes]
@@ -662,7 +707,8 @@ def update():
     empty_csv()
     multiplier = mulitplier_selection()
     print(multiplier, "multiplier ")
-    coll_dep_swap = cb_var.get()
+    coll_dep_swap_inhouse = cb_in_house_var.get()
+    coll_dep_3PL = cb_3PL_var.get()
     switch = scooter_ebike.get()
     print(switch)
     select_csv = csv_selector()
@@ -704,14 +750,17 @@ def update():
                     collected_tasks_3PL = retrieve_values(df7, CITY_NAME)
                     deployed_tasks_3PL = retrieve_values(df8, CITY_NAME)
                     waiting_for_parts = (retrieve_values(df9, CITY_NAME))
+                    waiting_for_service = retrieve_values(df14, CITY_NAME)
                     collected_tasks_FOA = retrieve_values(df10, CITY_NAME)
                     deployed_tasks_FOA = retrieve_values(df11, CITY_NAME)
                     swapped_tasks_FOA = retrieve_values(df12, CITY_NAME)
                     if multiplier == 0:
                         waiting_for_parts = 0
+                        waiting_for_service = 0
                     else:
                         waiting_for_parts = waiting_for_parts
-                    print(waiting_for_parts)
+                        waiting_for_service = waiting_for_service
+                    print(waiting_for_parts, waiting_for_service)
                     print(CITY_NAME, CITY_URL)
                     label_indicator.config(text= "", bg="#BAE2CD")
                     label_indicator.config(text= "In progress: " + CITY_NAME , bg="#BAE2CD")
@@ -728,13 +777,25 @@ def update():
                         MP_WS.update_cell(row_value[3], column_value, city_GMV)
                         MP_WS.update_cell(row_value[4], column_value, ride_duration)
                         MP_WS.update_cell(row_value[8], column_value, waiting_for_parts)
-                        if coll_dep_swap == 1:
+                        MP_WS.update_cell(row_value[12], column_value, waiting_for_service) # Waiting for service = Total Backlog
+                        if coll_dep_swap_inhouse == 1 and coll_dep_3PL == 1:
                             MP_WS.update_cell(row_value[5], column_value, collected_tasks_3PL)
                             MP_WS.update_cell(row_value[6], column_value, deployed_tasks_3PL)
                             MP_WS.update_cell(row_value[7], column_value, swapped_tasks_3PL)
                             MP_WS.update_cell(row_value[9], column_value, collected_tasks_FOA)
                             MP_WS.update_cell(row_value[10], column_value, deployed_tasks_FOA)
                             MP_WS.update_cell(row_value[11], column_value, swapped_tasks_FOA)
+
+                        elif coll_dep_swap_inhouse == 0 and coll_dep_3PL == 1:
+                            MP_WS.update_cell(row_value[5], column_value, collected_tasks_3PL)
+                            MP_WS.update_cell(row_value[6], column_value, deployed_tasks_3PL)
+                            MP_WS.update_cell(row_value[7], column_value, swapped_tasks_3PL)
+
+                        elif coll_dep_swap_inhouse == 1 and coll_dep_3PL == 0:
+                            MP_WS.update_cell(row_value[9], column_value, collected_tasks_FOA)
+                            MP_WS.update_cell(row_value[10], column_value, deployed_tasks_FOA)
+                            MP_WS.update_cell(row_value[11], column_value, swapped_tasks_FOA)
+
                         else:
                             "do nothing"
 
@@ -757,8 +818,28 @@ def update():
                 now_date = now_time.strftime('%Y-%m-%d')
                 now_time = now_time.strftime('%H:%M:%S')
                 UID = re.sub("[/].*[/]", "", os.path.expanduser('~'))
-                with open("coll_dep_swap_container.yaml", mode='w') as coll_dep_swap_container:
-                    yaml.dump(coll_dep_swap, coll_dep_swap_container, indent=2)
+                cb_var_json['In-house'] = coll_dep_swap_inhouse
+                cb_var_json['3PL'] = coll_dep_3PL
+                with open("coll_dep_swap_container.json", mode='w') as coll_dep_swap_container:
+                    json.dump(cb_var_json, coll_dep_swap_container)
+
+                if  cb_var_json['In-house'] == 1 and cb_var_json['3PL'] == 1:
+                    cb_log = 1
+                elif cb_var_json['In-house'] == 0 and cb_var_json['3PL'] == 0:
+                    cb_log = 0
+                elif cb_var_json['In-house'] == 0 and cb_var_json['3PL'] == 1:
+                    cb_log = "3PL"
+                elif cb_var_json['In-house'] == 1 and cb_var_json['3PL'] == 0:
+                    cb_log = "In-house"
+                else:
+                    cb_log = ""
+                if UID != "":
+                    try:
+                        with open("user_ID.yaml", mode='w') as user_id_file:
+                            yaml.dump(UID, user_id_file, indent=2)
+                    except yaml.parser.ParserError as yml_err:
+                        messagebox.showerror(text=yml_err)
+
                 with open(service_account_key, 'r') as service_account_json:
                     service_account_data = json.load(service_account_json)
                     client_email = service_account_data['client_email']
@@ -768,7 +849,7 @@ def update():
                     cities_with_data = df0_rows - 1
                     Lytics_WS.insert_row([client_email, number_of_cities_linked, cities_passed, cities_with_data,
                                           dropdown_value, time_spent_on_update, now_date,
-                                          now_time, switch, App_version, missing_log, UID],  2)
+                                          now_time, switch, App_version, missing_log, UID, cb_log],  2)
                 except gspread.exceptions.APIError:
                     messagebox.showerror(message="Credentials are not valid for analytics")
                 label_indicator.config(text="", bg="#BAE2CD")
@@ -860,6 +941,22 @@ def check_update():
         print(yml_err)
     except gspread.exceptions.NoValidUrlKeyFound as NoValidUrlKeyFound:
         messagebox.showerror(message=NoValidUrlKeyFound)
+
+def check_user():
+    try:
+        with open("Temp/user_ID.yaml", mode='r') as user_ID_yml:
+            user_ID = yaml.load(user_ID_yml, Loader=yaml.FullLoader)
+            if user_ID == "" or user_ID == (re.sub("[/].*[/]", "", os.path.expanduser('~'))):
+                return "OK"
+            else:
+                return "not valid"
+    except yaml.parser.ParserError as yml_err:
+        messagebox.showerror(message="no prevously saved UID" + str(yml_err))
+
+    except FileNotFoundError as old_user_data_missing_err:
+        messagebox.showerror(message="User ID can't be verified" + str(old_user_data_missing_err))
+        if old_user_data_missing_err == old_user_data_missing_err:
+            return "OK"
 
 
 def csv_selector():
@@ -1102,7 +1199,8 @@ def tick():
     browse_button.grid(row=3, column=3, padx=20, pady=0)
     dropdown.grid(row=3, column=2, padx=0, pady=10)
     scooter_ebike_dropdown.grid(row=4, column=2, padx=0, pady=10)
-    cb.grid(column=3, row=4)
+    cb_inhouse.grid(column=3, row=4)
+    cb_3PL.grid(column=3, row=5)
     label_indicator.config(text=default_message, bg="#BAE2CD")
     label_indicator.grid(column=2, row=1)
 
@@ -1133,11 +1231,28 @@ browse_button = Button(root, fg='#111111', text=str(' ' * 2 + 'View city list' +
 dropdown = OptionMenu(root, timeback, *dropdown_options)
 scooter_ebike_dropdown = OptionMenu(root, scooter_ebike, *scooter_ebike_dropdown_options)
 cb_var = IntVar()
+cb_in_house_var = IntVar()
+
+cb_3PL_var = IntVar()
+
 if cb_var_yaml == 0:
     cb_var.set(0)
 else:
     cb_var.set(1)
-cb = Checkbutton(root, text="Coll.Dep.Swap", variable=cb_var, onvalue=1, offvalue=0)
+
+if cb_var_3PL == 0:
+    cb_3PL_var.set(0)
+else:
+    cb_3PL_var.set(1)
+
+if cb_var_in_house == 0:
+    cb_in_house_var.set(0)
+else:
+    cb_in_house_var.set(1)
+
+
+cb_inhouse = Checkbutton(root, text="Coll.Dep.Swap In-house", variable=cb_in_house_var, onvalue=1, offvalue=0)
+cb_3PL = Checkbutton(root, text="Coll.Dep.Swap 3PL", variable=cb_3PL_var, onvalue=1, offvalue=0)
 label_indicator = tkinter.Label(root)
 label_indicator.grid(row=1, column=2)
 
