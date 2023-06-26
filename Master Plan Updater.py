@@ -35,9 +35,10 @@ from tkinterhtml import HtmlFrame
 #from signal import signal, SIGPIPE, SIG_DFL
 #Ignore SIG_PIPE and don't throw exceptions on it... (http://docs.python.org/library/signal.html)
 #signal(SIGPIPE, SIG_DFL)
+#_______________________________________________LEGACY CODE_____________________________________________________________
 
-App_version = "2.1.7"
-App_code = "NMF230220"
+App_version = "2.1.8"
+App_code = "H5TM230621"
 
 # LOAD Default message
 ssl._create_default_https_context = ssl._create_unverified_context
@@ -275,11 +276,73 @@ else:
 
     # vehciles waiting for service.
     try:
-        df14 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/vehicles_waiting_for_service.csv")
+        df14 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/vehicles_waiting_for_service.csv", thousands=',')
         df14 = df14.fillna(0)
     except FileNotFoundError:
         df14 = pd.DataFrame(empty_df)
         missing_log.append("vehicles_waiting_for_service.csv")
+
+# ______________________________________Import Actually waiting for parts_______________________________________________
+    # FROM: Waiting for Parts VS Inventory - Dump : Data_Dump
+    try:
+        df15 = pd.read_html(
+            "https://docs.google.com/spreadsheets/d/e/2PACX-1vRGJbzJGxdGv96zStGyv9Ce48XG_Bq8VRE5ki3OsfRWDlCpjVlVWwhCtEcSf__IbXIMAslfwkLTB1jm/pubhtml?gid=0&single=true",
+            skiprows=1)
+        df15 = df15[0]
+        del df15[df15.columns[0]]
+        df15 = df15.drop(['city', 'all_waiting_for_parts'], axis=1)
+        city = df15.pop('ASCII_City')
+        df15.insert(2, 'ASCII_City', city)
+
+    except urllib.error.URLError as URL_err:
+        messagebox.showerror(message=str(URL_err) + "You might not be connected to the internet.")
+        sys.exit()
+
+    try: # Read vehicle inflow
+        df16 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/inbound_for_maintenance.csv",
+                           thousands=',')
+        df16 = df16.fillna(0)
+
+    except FileNotFoundError:
+        df16 = pd.DataFrame(empty_df)
+        missing_log.append("inbound_for_maintenance.csv")
+
+    try: #Read vehicle outflow
+        df17 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/outbound_from_maintenance.csv",
+                           thousands=',')
+        df17 = df17.fillna(0)
+
+    except FileNotFoundError:
+        df17 = pd.DataFrame(empty_df)
+        missing_log.append("outbound_from_maintenance.csv")
+
+
+
+# TODO: Reference table
+# Import reference table.
+to_pop = ['LOC_ID',	'Closure', 'Country']
+ref_table = pd.read_html("https://docs.google.com/spreadsheets/d/e/2PACX-1vSiC77seEnxY1agmLMEvbD8WENw7itCkDL_prQx2wlQz2OKNUk3A9S6KOObQMThEDsHDyakECGrIo7N/pubhtml?gid=0&single=true",skiprows=1, encoding='utf-8')
+ref_table = ref_table[0]
+del ref_table[ref_table.columns[0]]
+
+ref_table = ref_table[ref_table['Closure'] != 'CLOSED']
+ref_table.drop(columns=to_pop, inplace=True)
+ref_table.rename(columns={"Main_City": "city"}, inplace=True)
+
+SC_cols = [i for i in ref_table.columns if "SC" in i ]
+city_map = pd.melt(ref_table, id_vars=['city'], value_vars=SC_cols, value_name="Satellite_City")
+city_map.drop_duplicates(inplace=True)
+#city_map.dropna(inplace=True)
+del city_map['variable']
+city_map = city_map[['Satellite_City','city']]
+city_map0 = city_map.values.tolist()
+city_map = [i for s in city_map0 for i in s]
+city_map = pd.DataFrame(city_map, columns=['City'])
+city_map.dropna(inplace=True), city_map.drop_duplicates(inplace=True)
+all_city_ref = city_map['City'].to_list # reverting back to as a list -> buut, type() will be method.
+all_city_ref = list(all_city_ref())  # converting method to list by list(some_method()) function.
+
+sat_cit_list = ref_table.melt(value_vars=SC_cols)['value'].dropna().drop_duplicates().tolist() # satellite city list
 
 # __________________________________________ In-house FOA calculations ________________________________________________
 
@@ -332,7 +395,7 @@ swaps_merge_df["FOA"] = swaps_merge_df["FOA"].fillna(0).astype(int)
 
 
 df12 = copy.deepcopy(swaps_merge_df[["Dynamic Timeframe", "FOA"]])
-df12['FOA'] = df12['FOA'].mask(df12['FOA'] < 0, 0) # msk negative values.
+df12['FOA'] = df12['FOA'].mask(df12['FOA'] < 0, 0) # mask negative values.
 df12.loc[-1] = ['City Country Region', 'Count Operations']
 df12 = df12.sort_index().reset_index(drop=True)
 df12.insert(0, 'Unnamed: 0', np.nan)
@@ -371,6 +434,7 @@ with open("coll_dep_swap_container.json", mode='r')as coll_dep_swap_container:
     cb_var_json = json.load(coll_dep_swap_container)
     cb_var_3PL = cb_var_json["3PL"]
     cb_var_in_house = cb_var_json["In-house"]
+    cb_var_Backlog = cb_var_json['Backlog']
 
 
 def save_user_data():
@@ -400,7 +464,7 @@ def import_user_data():
     """
     Loads the user data from the encrypted zip file.
     User can load the data from the menu bar.
-    :returns: Replaces the program's default files by the the previously saved files.
+    :returns: Replaces the program's default files by the previously saved files.
     """
     import_path = filedialog.askopenfilename(filetypes=[('Zip File', '*.zip')])
     if import_path != "":
@@ -459,6 +523,14 @@ def import_city_data():
     else:
         messagebox.showinfo(message=" City data not loaded")
 
+def in_out_flow():
+    """
+    Store inflow and outflow settings (not implemented feature)
+    :return:
+    """
+    ioflow_txt = open(os.path.join(os.getcwd() + "/Temp/in_out_flow.txt"),"w")
+    ioflow_txt.write("On\n")
+    ioflow_txt.close()
 
 def get_date(day):
     """
@@ -542,6 +614,7 @@ def retrieve_values(df, city):
     """∆- ed the Dynamic Timeframe to the first row since, it is not standardized by looker (For ex: Slovakia)"""
     # df_first_col = df[:, 1].values.tolist()
     df_first_col = df.iloc[:, 1].tolist()
+    prGreen(df_first_col)
      # df_first_col = df['Dynamic Timeframe'].values.tolist()
     active_cities_list = [i for i in all_cities_list if i in df_first_col]
     cities_indexes = [df_first_col.index(x) for x in active_cities_list]
@@ -554,6 +627,24 @@ def retrieve_values(df, city):
     return values
 
 
+
+def get_awfp(df15):
+    dropdown_value = timeback.get()
+    dropdown_index = dropdown_options.index(dropdown_value)
+    today = get_date(dropdown_index)
+    date_backlog = date.today() - timedelta(days=(abs(int((dropdown_index + 1) * (-1)))))
+    print("dropdown ind:",dropdown_index)
+    # convert the date column to a datetime object and set it as the index
+    #df15['Date'] = pd.to_datetime(df15['Date'])
+    #df15 = df15.set_index('Date')
+    # filter the dataframe by a specific date
+    df15_filtered = df15[df15['Date'] == str(date_backlog)]
+    #df15_filtered = df15.loc[str(yday)]
+    df15_filtered = df15_filtered.iloc[:,-2:] # return the last two columns only from the df
+    df15_filtered.insert(0,"index",'') # to match with retrieve values let's insert an empty col. to the left.
+    return df15_filtered
+
+
 # column B to C ∆ ed to match with new MP style and criteria names
 def MP_row_value(MP_Sheet):
     MP_column_A_data = MP_Sheet.values_batch_get('Daily!C:C').get('valueRanges')
@@ -562,7 +653,8 @@ def MP_row_value(MP_Sheet):
     crit = ['Active supply (on street)'], ['Rides'], ['Ridden vehicles'], ['Revenue (inc. VAT)'], ['Ride Duration (minutes)'], [
         '3PL # collected tasks fulfilled'], ['3PL # deployed tasks fulfilled'], ['3PL # swapped tasks fulfilled'], \
            ["Waiting for parts"], ['FOA # collected tasks fulfilled'], ['FOA # deployed tasks fulfilled'], \
-           ['FOA # swapped tasks fulfilled'], ['Backlog']
+           ['FOA # swapped tasks fulfilled'], ['Backlog'], ['Inflow damaged vehicles for maintenance'], [
+        'Outflow (fixed) vehicles, after maintenance']
     if 'Backlog daily change' in MP_column_A_list:
         MP_column_A_list.replace('Backlog daily change', 'Daily Change Backlog')
         """
@@ -699,6 +791,99 @@ def empty_csv():
 def update():
     label_indicator.config(text="", bg="#BAE2CD")
     label_indicator.config(text="Please Wait", bg="#BAE2CD")
+
+    sc = pd.read_csv("Master_Plan_links.csv") # read Scooter Cities added
+    eb = pd.read_csv("E-Bikes_Master_Plan_links.csv") # read Ebike cities added
+    del sc['cityURL'], eb['cityURL'] # drop the URLs
+    merged_list = (pd.merge(sc, eb, how='outer')).iloc[:, 0].tolist() # merge SC and EB cities names and add them to a list.
+    not_in_revamped_dict = [c for c in merged_list if c not in all_city_ref]  # filter cities that are in the merged list but don't apear in Revamped dictionary
+    nird_message = str("The following cities are not in the Revamped dictionary, Please contact COPS. " + str(not_in_revamped_dict))
+    # Display message if there are cities missing from the revamped dictionary
+    if not_in_revamped_dict != []:
+        messagebox.showerror(message=nird_message)
+        not_in_revamped_dict.clear() # clear the cities so once user removes the "bad" city it won't be in the list
+        label_indicator.config(text="", bg="#BAE2CD") # clear main message label.
+        label_indicator.config(text=default_message, bg="#BAE2CD") # Back to default message state.
+        return # back to the main.
+    i_sites = [c for c in merged_list if c not in sat_cit_list]
+    inventory_balance_awfp = get_awfp(df15)   # get inventory balance actual waiting for parts
+    inventory_balance_cities = inventory_balance_awfp['ASCII_City'].to_list()
+    i_sites_missing = [i for i in i_sites if i not in inventory_balance_cities]
+    missing_sites_message = str("The following sites are not in the Actual WFP Daily Data Dump. Please contact COPS. " + str(i_sites_missing))
+    if len(i_sites_missing) > 0:
+        messagebox.showerror(message=missing_sites_message)
+        i_sites_missing.clear()  # clear the cities so once user removes the "bad" city it won't be in the list
+        label_indicator.config(text="", bg="#BAE2CD")  # clear main message label.
+        label_indicator.config(text=default_message, bg="#BAE2CD")  # Back to default message state.
+        return
+    local_inv_sites = [i for i in i_sites if i in inventory_balance_cities]
+    AWFP = inventory_balance_awfp[inventory_balance_awfp['ASCII_City'].isin(local_inv_sites)] # Actual waiting for parts for the Local inventory site
+
+    ### Map waiting for service
+    city_mapping = dict(city_map0) # create dict. of the default revamped dictionary.
+    city_mapping = {k: v for k, v in city_mapping.items() if pd.notna(k)} # key value pairs if the key is notNa assign k,v to the dictionary.
+
+    df14.reset_index(drop=True, inplace=True)
+    df14['city_mapped'] = pd.Series(df14.iloc[:, 1].values).map(city_mapping).fillna('0')  # create city mapped column
+
+    for i in range(len(df14)):
+        if df14.at[i, 'city_mapped'] != '0':
+            df14.iat[i, 1] = df14.at[i, 'city_mapped']
+    del df14['city_mapped'], df14[df14.columns[0]]
+
+    df14_filtered = df14[(df14.iloc[:, 0] != 'City') & (df14.iloc[:, 0] != 'city')]
+    df14_filtered.insert(1, "Backlog", copy.deepcopy(df14_filtered.iloc[:, 1].str.replace(',', '')))
+    df14_filtered.drop(df14_filtered.columns[2], axis=1, inplace=True)
+    df14_filtered['Backlog'] = df14_filtered['Backlog'].astype(float)
+    df14_filtered = df14_filtered.groupby(df14_filtered.columns[0]).sum() # Total backlog per inventory site.
+    df14_filtered = df14_filtered.reset_index()
+    df14_filtered.insert(0, "Unnamed", value=0)
+
+
+#_________________________________________________VEHICLE INFLOW________________________________________________________
+# Disabled, atm no need to aggregate inflow and outflow per inventory site
+    """
+    df16['city_mapped'] = pd.Series(df16.iloc[:, 1].values).map(city_mapping).fillna('0')
+
+    for i in range(len(df16)):
+        if df16.at[i, 'city_mapped'] != '0':
+            df16.iat[i, 1] = df16.at[i, 'city_mapped']
+    del df16['city_mapped'], df16[df16.columns[0]]
+
+    for i in range(len(df16)):
+        try:
+            df16.iat[i, 1] = float(df16.iat[i, 1])
+        except ValueError:
+            df16.iat[i, 1] = np.nan  # Set the element at row i, column 1 to NaN
+    df16.dropna(inplace=True)
+    df16_inflow = df16.groupby(df16.columns[0]).sum().reset_index()
+    df16_inflow.insert(0, "Unnamed", value=0)
+    """
+
+#_____________________________________________END INFLOW_______________________________________________________________
+
+#_____________________________________________VEHICLE OUTFLOW____________________________________________________________
+# Disabled, atm no need to aggregate inflow and outflow per inventory site
+    """
+    df17['city_mapped'] = pd.Series(df17.iloc[:, 1].values).map(city_mapping).fillna('0')  # create city mapped column
+    for i in range(len(df17)):
+        if df17.at[i, 'city_mapped'] != '0':
+            df17.iat[i, 1] = df17.at[i, 'city_mapped']
+    del df17['city_mapped'], df17[df17.columns[0]]
+
+    for i in range(len(df17)):
+        try:
+            df17.iat[i, 1] = float(df17.iat[i, 1])
+        except ValueError:
+            df17.iat[i, 1] = np.nan  # Set the element at row i, column 1 to NaN
+
+    df17.dropna(inplace=True)
+    df17_outflow = df17.groupby(df16.columns[0]).sum().reset_index()
+    df17_outflow.insert(0, "Unnamed", value=0)
+    """
+
+    # _____________________________________________END VEHICLE OUTFLOW__________________________________________________
+
     print(check_version_approve())
     if check_version_approve() < 1:
         messagebox.showinfo(message="DErrNO5 e8641d72759eecd7d9461c8443ed2fcd, contact the developer M.")
@@ -709,6 +894,7 @@ def update():
     print(multiplier, "multiplier ")
     coll_dep_swap_inhouse = cb_in_house_var.get()
     coll_dep_3PL = cb_3PL_var.get()
+    cb_bl = cb_Backlog_var.get()
     switch = scooter_ebike.get()
     print(switch)
     select_csv = csv_selector()
@@ -749,19 +935,22 @@ def update():
                     swapped_tasks_3PL = retrieve_values(df6, CITY_NAME)
                     collected_tasks_3PL = retrieve_values(df7, CITY_NAME)
                     deployed_tasks_3PL = retrieve_values(df8, CITY_NAME)
-                    waiting_for_parts = (retrieve_values(df9, CITY_NAME))
-                    waiting_for_service = retrieve_values(df14, CITY_NAME)
+                    waiting_for_parts = (retrieve_values(AWFP, CITY_NAME)) * multiplier
+                    waiting_for_service = (retrieve_values(df14_filtered, CITY_NAME)) * multiplier
                     collected_tasks_FOA = retrieve_values(df10, CITY_NAME)
                     deployed_tasks_FOA = retrieve_values(df11, CITY_NAME)
                     swapped_tasks_FOA = retrieve_values(df12, CITY_NAME)
+                    vehicle_inflow = retrieve_values(df16, CITY_NAME)
+                    vehicle_outflow = retrieve_values(df17, CITY_NAME)
                     if multiplier == 0:
                         waiting_for_parts = 0
                         waiting_for_service = 0
                     else:
                         waiting_for_parts = waiting_for_parts
                         waiting_for_service = waiting_for_service
-                    print(waiting_for_parts, waiting_for_service)
                     print(CITY_NAME, CITY_URL)
+                    print(vehicle_inflow)
+                    prGreen(waiting_for_service)
                     label_indicator.config(text= "", bg="#BAE2CD")
                     label_indicator.config(text= "In progress: " + CITY_NAME , bg="#BAE2CD")
                     MP_sheet = gc.open_by_url(CITY_URL)
@@ -776,8 +965,11 @@ def update():
                         MP_WS.update_cell(row_value[2], column_value, scooters_with_rides)
                         MP_WS.update_cell(row_value[3], column_value, city_GMV)
                         MP_WS.update_cell(row_value[4], column_value, ride_duration)
-                        MP_WS.update_cell(row_value[8], column_value, waiting_for_parts)
-                        MP_WS.update_cell(row_value[12], column_value, waiting_for_service) # Waiting for service = Total Backlog
+                        if cb_bl == 1:
+                            MP_WS.update_cell(row_value[8], column_value, waiting_for_parts)
+                            MP_WS.update_cell(row_value[12], column_value, waiting_for_service)  # Waiting for service = Total Backlog
+                            MP_WS.update_cell(row_value[13], column_value, vehicle_inflow)
+                            MP_WS.update_cell(row_value[14], column_value, vehicle_outflow)
                         if coll_dep_swap_inhouse == 1 and coll_dep_3PL == 1:
                             MP_WS.update_cell(row_value[5], column_value, collected_tasks_3PL)
                             MP_WS.update_cell(row_value[6], column_value, deployed_tasks_3PL)
@@ -820,6 +1012,7 @@ def update():
                 UID = re.sub("[/].*[/]", "", os.path.expanduser('~'))
                 cb_var_json['In-house'] = coll_dep_swap_inhouse
                 cb_var_json['3PL'] = coll_dep_3PL
+                cb_var_json['Backlog'] = cb_bl #checkbox backlog
                 with open("coll_dep_swap_container.json", mode='w') as coll_dep_swap_container:
                     json.dump(cb_var_json, coll_dep_swap_container)
 
@@ -833,6 +1026,7 @@ def update():
                     cb_log = "In-house"
                 else:
                     cb_log = ""
+
                 if UID != "":
                     try:
                         with open("user_ID.yaml", mode='w') as user_id_file:
@@ -849,7 +1043,7 @@ def update():
                     cities_with_data = df0_rows - 1
                     Lytics_WS.insert_row([client_email, number_of_cities_linked, cities_passed, cities_with_data,
                                           dropdown_value, time_spent_on_update, now_date,
-                                          now_time, switch, App_version, missing_log, UID, cb_log],  2)
+                                          now_time, switch, App_version, missing_log, UID, cb_log, cb_bl],  2)
                 except gspread.exceptions.APIError:
                     messagebox.showerror(message="Credentials are not valid for analytics")
                 label_indicator.config(text="", bg="#BAE2CD")
@@ -1107,9 +1301,12 @@ filemenu = Menu(menubar, tearoff=1)
 helpmenu = Menu(menubar, tearoff=1)
 filemenu.add_command(label="Import User Data", command=import_user_data)
 filemenu.add_command(label="Export User Data", command=save_user_data)
+filemenu.add_separator()
 filemenu.add_command(label="Import City List", command=import_city_data)
 filemenu.add_command(label="Export City List", command=save_city_data)
 filemenu.add_separator()
+#filemenu.add_command(label="Inflow/Outflow Agg. / Inv Site, Dev. Only", command=in_out_flow)
+
 menubar.add_cascade(label="File", menu=filemenu)
 
 
@@ -1201,6 +1398,7 @@ def tick():
     scooter_ebike_dropdown.grid(row=4, column=2, padx=0, pady=10)
     cb_inhouse.grid(column=3, row=4)
     cb_3PL.grid(column=3, row=5)
+    cb_Backlog.grid(row=5, column=2, padx=0, pady=10)
     label_indicator.config(text=default_message, bg="#BAE2CD")
     label_indicator.grid(column=2, row=1)
 
@@ -1232,27 +1430,25 @@ dropdown = OptionMenu(root, timeback, *dropdown_options)
 scooter_ebike_dropdown = OptionMenu(root, scooter_ebike, *scooter_ebike_dropdown_options)
 cb_var = IntVar()
 cb_in_house_var = IntVar()
-
 cb_3PL_var = IntVar()
+cb_Backlog_var = IntVar()
 
-if cb_var_yaml == 0:
-    cb_var.set(0)
-else:
-    cb_var.set(1)
 
-if cb_var_3PL == 0:
-    cb_3PL_var.set(0)
-else:
-    cb_3PL_var.set(1)
+cb_var.set(0 if cb_var_yaml == 0 else 1)
+cb_3PL_var.set(0 if cb_var_3PL == 0 else 1)
+cb_in_house_var.set(0 if cb_var_in_house == 0 else 1)
+cb_Backlog_var.set(0 if cb_var_Backlog == 0 else 1)
 
-if cb_var_in_house == 0:
-    cb_in_house_var.set(0)
-else:
-    cb_in_house_var.set(1)
+def cb_change(read_value, write_value):
+    if read_value ==0:
+        write_value.set(0)
+    else:
+        write_value.set(1)
 
 
 cb_inhouse = Checkbutton(root, text="Coll.Dep.Swap In-house", variable=cb_in_house_var, onvalue=1, offvalue=0)
 cb_3PL = Checkbutton(root, text="Coll.Dep.Swap 3PL", variable=cb_3PL_var, onvalue=1, offvalue=0)
+cb_Backlog = Checkbutton(root, text="Backlog Inflow Outflow", variable=cb_Backlog_var, onvalue=1, offvalue=0)
 label_indicator = tkinter.Label(root)
 label_indicator.grid(row=1, column=2)
 
