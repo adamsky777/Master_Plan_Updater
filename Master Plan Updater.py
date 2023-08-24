@@ -37,8 +37,8 @@ from tkinterhtml import HtmlFrame
 #signal(SIGPIPE, SIG_DFL)
 #_______________________________________________LEGACY CODE_____________________________________________________________
 
-App_version = "2.1.8"
-App_code = "H5TM230621"
+App_version = "2.2.0"
+App_code = "U8TC230816"
 
 # LOAD Default message
 ssl._create_default_https_context = ssl._create_unverified_context
@@ -60,13 +60,13 @@ empty_df = {
 }
 empty_df_3PL = {
     'Unnamed: 0':[],
-    'Dynamic Timeframe':[],
+    'Dynamic Timeframe Task Resolved':[],
     '3PL': []
                }
 
 empty_df_Total = {
     'Unnamed: 0': [],
-    'Dynamic Timeframe': [],
+    'Dynamic Timeframe Task Resolved': [],
     'Total': []
 }
 
@@ -191,7 +191,7 @@ else:
 
     try:
         # battery swaps 3PL df6
-        df6 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/battery_swaps_by_3pl.csv", skiprows=[1],
+        df6 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/battery_swap_tasks_resolved_by_3pls.csv", skiprows=[1],
                           thousands=',')
         df6 = df6.fillna("0")
         if df6.shape[0] == 0:
@@ -204,7 +204,7 @@ else:
 
     try:
         # collected 3PL df7
-        df7 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/collected_by_3pl.csv", skiprows=[1])
+        df7 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/collect_tasks_resolved_by_3pls.csv", skiprows=[1], thousands=',')
         df7 = df7.fillna("0")
         if df7.shape[0] == 0:
             df7 = pd.DataFrame(empty_df_3PL)
@@ -216,7 +216,7 @@ else:
 
     try:
         # deployed 3PL df8
-        df8 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/deployed_by_3pl.csv", skiprows=[1])
+        df8 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/deploy_tasks_resolved_by_3pls.csv", skiprows=[1], thousands=',')
         df8 = df8.fillna("0")
         if df8.shape[0] == 0:
             df8 = pd.DataFrame(empty_df_3PL)
@@ -240,7 +240,7 @@ else:
 
     try:
         # sum collected df10
-        df10 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/collected.csv", skiprows=[1])
+        df10 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/collect_tasks_resolved.csv", skiprows=[1], thousands=',')
         df10 = df10.fillna("0")
         if df10.shape[0] == 0:
             df10 = pd.DataFrame(empty_df_Total)
@@ -252,7 +252,7 @@ else:
 
     try:
         # sum deployed df11
-        df11 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/deployed.csv", skiprows=[1])
+        df11 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/deploy_tasks_resolved.csv", skiprows=[1], thousands=',')
         df11 = df11.fillna("0")
         if df11.shape[0] == 0:
             df11 = pd.DataFrame(empty_df_Total)
@@ -263,7 +263,7 @@ else:
         missing_log.append("deployed.csv")
     try:
         # sum battery_swaps df12
-        df12 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/battery_swaps.csv", skiprows=[1],
+        df12 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/battery_swap_tasks_resolved.csv", skiprows=[1],
                            thousands=',')
         df12 = df12.fillna("0")
         if df12.shape[0] == 0:
@@ -274,20 +274,20 @@ else:
         df12 = pd.DataFrame(empty_df_Total)
         missing_log.append("battery_swaps.csv")
 
-    # vehciles waiting for service.
+    # Total Backlog:
     try:
-        df14 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/vehicles_waiting_for_service.csv", thousands=',')
+        df14 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/vehicles_waiting_for_service_and_being_services_by_days.csv", thousands=',')
         df14 = df14.fillna(0)
     except FileNotFoundError:
         df14 = pd.DataFrame(empty_df)
-        missing_log.append("vehicles_waiting_for_service.csv")
+        missing_log.append("vehicles_waiting_for_service_and_being_services_by_days.csv")
 
 # ______________________________________Import Actually waiting for parts_______________________________________________
     # FROM: Waiting for Parts VS Inventory - Dump : Data_Dump
     try:
         df15 = pd.read_html(
             "https://docs.google.com/spreadsheets/d/e/2PACX-1vRGJbzJGxdGv96zStGyv9Ce48XG_Bq8VRE5ki3OsfRWDlCpjVlVWwhCtEcSf__IbXIMAslfwkLTB1jm/pubhtml?gid=0&single=true",
-            skiprows=1)
+            skiprows=1, thousands=',', encoding='utf-8')
         df15 = df15[0]
         del df15[df15.columns[0]]
         df15 = df15.drop(['city', 'all_waiting_for_parts'], axis=1)
@@ -315,6 +315,32 @@ else:
     except FileNotFoundError:
         df17 = pd.DataFrame(empty_df)
         missing_log.append("outbound_from_maintenance.csv")
+
+    try: #read rebalances by 3PL
+        df18 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/rebalance__50m_tasks_resolved_by_3pls.csv",
+                           thousands=',', skiprows=[1])
+        df18 = df18.fillna(0)
+        if df18.shape[0] == 0:
+            df18 = pd.DataFrame(empty_df_3PL)
+        else:
+            df18 = df18.rename(columns={df18.columns[2]: '3PL'})
+    except FileNotFoundError:
+        df18 = pd.DataFrame(empty_df_3PL)
+        missing_log.append("rebalances_by_3PL.csv")
+
+    try: # read sum rebalances:
+        df19 = pd.read_csv("~/Downloads/dashboard-daily_numbers_for_masterplan/rebalance__50m_tasks_resolved.csv",
+                           thousands=',', skiprows=[1])
+        df19 = df19.fillna(0)
+        if df19.shape[0] == 0:
+            df19 = pd.DataFrame(empty_df_Total)
+        else:
+            df19 = df19.rename(columns={df19.columns[2]: 'Total'})
+    except FileNotFoundError:
+        df19 = pd.DataFrame(empty_df_Total)
+        missing_log.append("rebalances.csv")
+
+
 
 
 
@@ -349,7 +375,7 @@ sat_cit_list = ref_table.melt(value_vars=SC_cols)['value'].dropna().drop_duplica
 print(df7.columns)
 
 collected_merge_df = pd.merge(df10, df7,
-                   on='Dynamic Timeframe',
+                   on='Dynamic Timeframe Task Resolved',
                    how='outer')
 
 #prGreen(collected_merge_df.columns)
@@ -359,7 +385,7 @@ collected_merge_df["FOA"] = collected_merge_df['Total'] - collected_merge_df["3P
 collected_merge_df["FOA"] = collected_merge_df["FOA"].fillna(0)
 
 # Use deepcopy function provided in the default package 'copy'
-df10 = copy.deepcopy(collected_merge_df[["Dynamic Timeframe", "FOA"]])
+df10 = copy.deepcopy(collected_merge_df[["Dynamic Timeframe Task Resolved", "FOA"]])
 df10['FOA'] = df10['FOA'].mask(df10['FOA'] < 0, 0) # mask negative values.
 df10.loc[-1] = ['City Country Region', 'Count Operations']
 df10 = df10.sort_index().reset_index(drop=True)
@@ -367,7 +393,7 @@ df10.insert(0, 'Unnamed: 0', np.nan)
 
 
 deployed_merge_df = pd.merge(df11, df8,
-                   on='Dynamic Timeframe',
+                   on='Dynamic Timeframe Task Resolved',
                    how='outer')
 
 deployed_merge_df['Total'] = deployed_merge_df['Total'].fillna(0).astype(int)
@@ -375,17 +401,17 @@ deployed_merge_df["3PL"] = deployed_merge_df["3PL"].fillna(0).astype(int)
 deployed_merge_df["FOA"] = deployed_merge_df['Total'] - deployed_merge_df["3PL"]
 deployed_merge_df["FOA"] = deployed_merge_df["FOA"].fillna(0)
 
-df11 = copy.deepcopy(deployed_merge_df[["Dynamic Timeframe", "FOA"]])
+df11 = copy.deepcopy(deployed_merge_df[["Dynamic Timeframe Task Resolved", "FOA"]])
 df11['FOA'] = df11['FOA'].mask(df11['FOA'] < 0, 0) # mask negative values.
 df11.loc[-1] = ['City Country Region', 'Count Operations']
 df11 = df11.sort_index().reset_index(drop=True)
 df11.insert(0, 'Unnamed: 0', np.nan)
 
-
-
 swaps_merge_df = pd.merge(df12, df6,
-                   on='Dynamic Timeframe',
+                   on='Dynamic Timeframe Task Resolved',
                    how='outer')
+
+
 
 swaps_merge_df['Total'] = swaps_merge_df['Total'].fillna(0).astype(int)
 swaps_merge_df["3PL"] = swaps_merge_df["3PL"].fillna(0).astype(int)
@@ -394,17 +420,34 @@ swaps_merge_df["FOA"] = swaps_merge_df["FOA"].fillna(0).astype(int)
 
 
 
-df12 = copy.deepcopy(swaps_merge_df[["Dynamic Timeframe", "FOA"]])
+df12 = copy.deepcopy(swaps_merge_df[["Dynamic Timeframe Task Resolved", "FOA"]])
 df12['FOA'] = df12['FOA'].mask(df12['FOA'] < 0, 0) # mask negative values.
 df12.loc[-1] = ['City Country Region', 'Count Operations']
 df12 = df12.sort_index().reset_index(drop=True)
 df12.insert(0, 'Unnamed: 0', np.nan)
 
 
+rebalance_merge_df = pd.merge(df18, df19,
+                   on='Dynamic Timeframe Task Resolved',
+                   how='outer')
+
+
+
+rebalance_merge_df['Total'] = rebalance_merge_df['Total'].fillna(0).astype(int)
+rebalance_merge_df["3PL"] = rebalance_merge_df["3PL"].fillna(0).astype(int)
+rebalance_merge_df["FOA"] = rebalance_merge_df['Total'] - rebalance_merge_df["3PL"]
+rebalance_merge_df["FOA"] = rebalance_merge_df["FOA"].fillna(0).astype(int)
+
+df19 = copy.deepcopy(swaps_merge_df[["Dynamic Timeframe Task Resolved", "FOA"]])
+df19['FOA'] = df19['FOA'].mask(df19['FOA'] < 0, 0) # mask negative values.
+df19.loc[-1] = ['City Country Region', 'Count Operations']
+df19 = df19.sort_index().reset_index(drop=True)
+df19.insert(0, 'Unnamed: 0', np.nan)
+
 
 print(df12.columns, df6.columns)
 
-for i in [df12, df11, df10, df6, df7, df8]:
+for i in [df19,df18,df12, df11, df10, df6, df7, df8]:
     print(i.shape)
 
 def revert_df_layout(df):
@@ -413,7 +456,7 @@ def revert_df_layout(df):
     df = df.sort_index().reset_index(drop=True)
     return df
 
-for i in [df12, df11, df10, df6, df7, df8]:
+for i in [df19, df18, df12, df11, df10, df6, df7, df8]:
     revert_df_layout(i)
 
 
@@ -654,7 +697,7 @@ def MP_row_value(MP_Sheet):
         '3PL # collected tasks fulfilled'], ['3PL # deployed tasks fulfilled'], ['3PL # swapped tasks fulfilled'], \
            ["Waiting for parts"], ['FOA # collected tasks fulfilled'], ['FOA # deployed tasks fulfilled'], \
            ['FOA # swapped tasks fulfilled'], ['Backlog'], ['Inflow damaged vehicles for maintenance'], [
-        'Outflow (fixed) vehicles, after maintenance']
+        'Outflow (fixed) vehicles, after maintenance'], ['3PL # rebalanced tasks fulfilled'], ['FOA # rebalanced tasks fulfilled']
     if 'Backlog daily change' in MP_column_A_list:
         MP_column_A_list.replace('Backlog daily change', 'Daily Change Backlog')
         """
@@ -935,11 +978,13 @@ def update():
                     swapped_tasks_3PL = retrieve_values(df6, CITY_NAME)
                     collected_tasks_3PL = retrieve_values(df7, CITY_NAME)
                     deployed_tasks_3PL = retrieve_values(df8, CITY_NAME)
+                    rebalance_tasks_3PL = retrieve_values(df18, CITY_NAME)
                     waiting_for_parts = (retrieve_values(AWFP, CITY_NAME)) * multiplier
                     waiting_for_service = (retrieve_values(df14_filtered, CITY_NAME)) * multiplier
                     collected_tasks_FOA = retrieve_values(df10, CITY_NAME)
                     deployed_tasks_FOA = retrieve_values(df11, CITY_NAME)
                     swapped_tasks_FOA = retrieve_values(df12, CITY_NAME)
+                    rebalance_tasks_FOA = retrieve_values(df19, CITY_NAME)
                     vehicle_inflow = retrieve_values(df16, CITY_NAME)
                     vehicle_outflow = retrieve_values(df17, CITY_NAME)
                     if multiplier == 0:
@@ -974,19 +1019,25 @@ def update():
                             MP_WS.update_cell(row_value[5], column_value, collected_tasks_3PL)
                             MP_WS.update_cell(row_value[6], column_value, deployed_tasks_3PL)
                             MP_WS.update_cell(row_value[7], column_value, swapped_tasks_3PL)
+                            MP_WS.update_cell(row_value[15], column_value, rebalance_tasks_3PL)
                             MP_WS.update_cell(row_value[9], column_value, collected_tasks_FOA)
                             MP_WS.update_cell(row_value[10], column_value, deployed_tasks_FOA)
                             MP_WS.update_cell(row_value[11], column_value, swapped_tasks_FOA)
+                            MP_WS.update_cell(row_value[16], column_value, rebalance_tasks_FOA)
+
 
                         elif coll_dep_swap_inhouse == 0 and coll_dep_3PL == 1:
                             MP_WS.update_cell(row_value[5], column_value, collected_tasks_3PL)
                             MP_WS.update_cell(row_value[6], column_value, deployed_tasks_3PL)
                             MP_WS.update_cell(row_value[7], column_value, swapped_tasks_3PL)
+                            MP_WS.update_cell(row_value[15], column_value, rebalance_tasks_3PL)
+
 
                         elif coll_dep_swap_inhouse == 1 and coll_dep_3PL == 0:
                             MP_WS.update_cell(row_value[9], column_value, collected_tasks_FOA)
                             MP_WS.update_cell(row_value[10], column_value, deployed_tasks_FOA)
                             MP_WS.update_cell(row_value[11], column_value, swapped_tasks_FOA)
+                            MP_WS.update_cell(row_value[16], column_value, rebalance_tasks_FOA)
 
                         else:
                             "do nothing"
@@ -1275,19 +1326,7 @@ def about_dev():
 def third_window():
     history_html = 'file:///' + os.getcwd() + '/' + 'history.html'
     callback(history_html)
-    # Does not work with tkinkter somehow
-    """
-    with open('history.html') as app_history:
-        contents = app_history.read()
-    third_win = Tk()
 
-    third_win.config(bg='#BAE2CD')
-    third_win.title("About Me")
-
-    html_label = HtmlLabel(third_win, text=contents)
-    HtmlLabel.set_zoom(html_label, 1.5)
-    html_label.pack(fill='both', expand=True)
-"""
 
 Settings_ = True
 
@@ -1446,8 +1485,8 @@ def cb_change(read_value, write_value):
         write_value.set(1)
 
 
-cb_inhouse = Checkbutton(root, text="Coll.Dep.Swap In-house", variable=cb_in_house_var, onvalue=1, offvalue=0)
-cb_3PL = Checkbutton(root, text="Coll.Dep.Swap 3PL", variable=cb_3PL_var, onvalue=1, offvalue=0)
+cb_inhouse = Checkbutton(root, text="Coll.Dep.Swap.Reb- In-house", variable=cb_in_house_var, onvalue=1, offvalue=0)
+cb_3PL = Checkbutton(root, text="Coll.Dep.Swap.Reb 3PL", variable=cb_3PL_var, onvalue=1, offvalue=0)
 cb_Backlog = Checkbutton(root, text="Backlog Inflow Outflow", variable=cb_Backlog_var, onvalue=1, offvalue=0)
 label_indicator = tkinter.Label(root)
 label_indicator.grid(row=1, column=2)
