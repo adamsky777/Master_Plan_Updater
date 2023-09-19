@@ -37,8 +37,8 @@ from tkinterhtml import HtmlFrame
 #signal(SIGPIPE, SIG_DFL)
 #_______________________________________________LEGACY CODE_____________________________________________________________
 
-App_version = "2.2.0"
-App_code = "U8TC230816"
+App_version = "2.2.1"
+App_code = "BLES230903"
 
 # LOAD Default message
 ssl._create_default_https_context = ssl._create_unverified_context
@@ -129,7 +129,7 @@ else:
         df0_rows = int(shape_df0[0])
         df0_columns = int(shape_df0[1])
         # Drops a message to the user only when incorrect schedule loaded in. Ignores when values missing.
-        prGreen(df0_columns)
+        print(df0_columns)
         if df0_columns > 3 and df0_rows > 0:
             messagebox.showerror(message="Your Looker schedule is incorrect. Too many days in the data. "
                                          "Set it to: 'is in the last 1 complete day'.")
@@ -284,7 +284,7 @@ else:
 
 # ______________________________________Import Actually waiting for parts_______________________________________________
     # FROM: Waiting for Parts VS Inventory - Dump : Data_Dump
-    try:
+    try: # TODO: Change source to a new data source,
         df15 = pd.read_html(
             "https://docs.google.com/spreadsheets/d/e/2PACX-1vRGJbzJGxdGv96zStGyv9Ce48XG_Bq8VRE5ki3OsfRWDlCpjVlVWwhCtEcSf__IbXIMAslfwkLTB1jm/pubhtml?gid=0&single=true",
             skiprows=1, thousands=',', encoding='utf-8')
@@ -378,7 +378,7 @@ collected_merge_df = pd.merge(df10, df7,
                    on='Dynamic Timeframe Task Resolved',
                    how='outer')
 
-#prGreen(collected_merge_df.columns)
+#print(collected_merge_df.columns)
 collected_merge_df['Total'] = collected_merge_df['Total'].fillna(0).astype(int)
 collected_merge_df["3PL"] = collected_merge_df["3PL"].fillna(0).astype(int)
 collected_merge_df["FOA"] = collected_merge_df['Total'] - collected_merge_df["3PL"]
@@ -514,7 +514,7 @@ def import_user_data():
         with zipfile.ZipFile(import_path, 'r') as user_data_zip:
             user_data_zip.extractall(pwd=locker.encode(), path="Temp/")
             temp_folder_items = os.listdir("Temp")
-            prGreen(check_user())
+            print(check_user())
             if check_user() == "OK":
                 user_data_zip.extractall(pwd=locker.encode())
                 messagebox.showinfo(message="User Data successfully loaded")
@@ -522,7 +522,7 @@ def import_user_data():
                     send2trash.send2trash(os.path.join("Temp", i))
 
             elif check_user() == "not valid":
-                prGreen(temp_folder_items)
+                print(temp_folder_items)
                 for i in temp_folder_items:
                     send2trash.send2trash(os.path.join("Temp", i))
                 messagebox.showerror(message="User Data is NOT interchangeable. Use city list instead.")
@@ -657,7 +657,7 @@ def retrieve_values(df, city):
     """∆- ed the Dynamic Timeframe to the first row since, it is not standardized by looker (For ex: Slovakia)"""
     # df_first_col = df[:, 1].values.tolist()
     df_first_col = df.iloc[:, 1].tolist()
-    prGreen(df_first_col)
+    #(df_first_col)
      # df_first_col = df['Dynamic Timeframe'].values.tolist()
     active_cities_list = [i for i in all_cities_list if i in df_first_col]
     cities_indexes = [df_first_col.index(x) for x in active_cities_list]
@@ -946,7 +946,6 @@ def update():
     MP_links_df = pd.read_csv(select_csv)
     number_of_cities_linked = MP_links_df.shape[0]
     all_cities_list = MP_links_df['CityName'].values.tolist()
-    print(all_cities_list)
     label_indicator.config(text="", bg="#BAE2CD")
     label_indicator.config(text="Connection OK", bg="#BAE2CD")
     sleep(0.5)
@@ -995,7 +994,6 @@ def update():
                         waiting_for_service = waiting_for_service
                     print(CITY_NAME, CITY_URL)
                     print(vehicle_inflow)
-                    prGreen(waiting_for_service)
                     label_indicator.config(text= "", bg="#BAE2CD")
                     label_indicator.config(text= "In progress: " + CITY_NAME , bg="#BAE2CD")
                     MP_sheet = gc.open_by_url(CITY_URL)
